@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
 
+// TODO: TRY MAKING INPUT VARIABLE FOR NODE & EDGE ID
+// trying a global variable to determine unique node id
+const startNode = 10;
+
 // Math helper for pgRouting "cost"
 const calculateDistance = (x1, y1, x2, y2) => {
   return Math.round(Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)) * 100) / 100;
@@ -9,7 +13,7 @@ export default function App() {
   const [imageUrl, setImageUrl] = useState(null);
   const [mode, setMode] = useState('ADD_NODE'); 
   const [zoom, setZoom] = useState(1); 
-  const [nextNodeId, setNextNodeId] = useState(1);
+  const [nextNodeId, setNextNodeId] = useState(startNode); // starting id is startNode
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [draftEdge, setDraftEdge] = useState(null);
