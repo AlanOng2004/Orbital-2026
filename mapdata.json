@@ -1,0 +1,31 @@
+{
+  "faculties": [
+    {
+      "faculty": "COM",
+      "buildings": [
+        {
+          "building": "COM1",
+          "floors": [
+            { "floor": "B1", "image": "COMBLK1_B1.jpg" },
+            { "floor": "01", "image": "COMBLK1_01.jpg" },
+            { "floor": "02", "image": "COMBLK1_02.jpg" },
+            { "floor": "03", "image": "COMBLK1_03.jpg" }
+          ],
+          "nodes": [
+            {
+              "img": "COMBLK1_B1.jpg",
+              "corridor": "",
+              "index": 0,
+              "name": "",
+              "x": null,
+              "y": null
+            }
+          ],
+          "edges": [
+            { "node1": null, "node2": null, "weight": null, "type": null }
+          ]
+        }
+      ]
+    }
+  ]
+}
