@@ -6,12 +6,13 @@ export default function App() {
   const [edges, setEdges] = useState([]);
   const [mode, setMode] = useState('ADD_NODE');
   const [nextNodeId, setNextNodeId] = useState(1);
+  const [nextEdgeId, setNextEdgeId] = useState(1); // NEW: Track edge IDs for hover targeting
   const [selectedNode, setSelectedNode] = useState(null);
   const [zoom, setZoom] = useState(1);
   const [history, setHistory] = useState([]);
 
-  // --- NEW: Hover State ---
   const [hoveredNodeId, setHoveredNodeId] = useState(null);
+  const [hoveredEdgeId, setHoveredEdgeId] = useState(null); // NEW: Track hovered edge
 
   const imgRef = useRef(null);
 
@@ -19,6 +20,7 @@ export default function App() {
   const [currentNodeType, setCurrentNodeType] = useState("Joints");
   const [currentFloorplanId, setCurrentFloorplanId] = useState(1);
 
+  // Defaults for new edges
   const [currentIsAccessible, setCurrentIsAccessible] = useState(true);
   const [currentEdgeType, setCurrentEdgeType] = useState("walkway");
 
@@ -62,14 +64,19 @@ export default function App() {
           const dy = node.y - selectedNode.y;
           const weight = Math.sqrt(dx * dx + dy * dy);
 
+          // NEW: Edges now store forward and backward accessibility independently
           const newEdge = {
+            id: nextEdgeId,
             source: selectedNode.id,
             target: node.id,
             weight: weight,
-            is_accessible: currentIsAccessible,
+            is_accessible_fwd: currentIsAccessible, // Source -> Target
+            is_accessible_bwd: currentIsAccessible, // Target -> Source
             edge_type: currentEdgeType
           };
+
           setEdges([...edges, newEdge]);
+          setNextEdgeId(nextEdgeId + 1);
           setHistory([...history, 'EDGE']);
         }
         setSelectedNode(null);
@@ -87,6 +94,7 @@ export default function App() {
       setSelectedNode(null);
     } else if (lastAction === 'EDGE') {
       setEdges(edges.slice(0, -1));
+      setNextEdgeId(prev => Math.max(1, prev - 1));
     }
     setHistory(history.slice(0, -1));
   };
@@ -97,8 +105,24 @@ export default function App() {
       setEdges([]);
       setHistory([]);
       setNextNodeId(1);
+      setNextEdgeId(1);
       setSelectedNode(null);
     }
+  };
+
+  // NEW: Toggle Edge Accessibility Direction
+  const toggleEdgeAccess = (e, edgeId, direction) => {
+    e.stopPropagation(); // Stop click from bleeding into the canvas
+    setEdges(edges.map(edge => {
+      if (edge.id === edgeId) {
+        return {
+          ...edge,
+          is_accessible_fwd: direction === 'fwd' ? !edge.is_accessible_fwd : edge.is_accessible_fwd,
+          is_accessible_bwd: direction === 'bwd' ? !edge.is_accessible_bwd : edge.is_accessible_bwd,
+        };
+      }
+      return edge;
+    }));
   };
 
   const generateSQL = () => {
@@ -108,18 +132,34 @@ export default function App() {
       `(${n.id}, '${n.name}', '${n.type}', ${n.floorplan_id}, ${n.x}, ${n.y})`
     ).join(",\n");
 
-    const edgeValues = edges.map(e =>
-      `(${e.source}, ${e.target}, ${e.weight.toFixed(2)}, ${e.is_accessible ? 'TRUE' : 'FALSE'}, '${e.edge_type}')`
-    ).join(",\n");
+    // NEW: Split every physical line into TWO database edges
+    const edgeValuesArray = [];
+    edges.forEach(e => {
+      // Forward Edge (Source -> Target)
+      edgeValuesArray.push(
+        `(${e.source}, ${e.target}, ${e.weight.toFixed(2)}, ${e.is_accessible_fwd ? 'TRUE' : 'FALSE'}, '${e.edge_type}')`
+      );
+      // Backward Edge (Target -> Source)
+      edgeValuesArray.push(
+        `(${e.target}, ${e.source}, ${e.weight.toFixed(2)}, ${e.is_accessible_bwd ? 'TRUE' : 'FALSE'}, '${e.edge_type}')`
+      );
+    });
 
     let sql = `-- Insert Nodes\nINSERT INTO nodes (node_id, node_name, node_type, floorplan_id, x_coord, y_coord) VALUES\n${nodeValues};\n`;
 
-    if (edges.length > 0) {
-      sql += `\n-- Insert Edges\nINSERT INTO edges (source, target, weight, is_accessible, edge_type) VALUES\n${edgeValues};`;
+    if (edgeValuesArray.length > 0) {
+      sql += `\n-- Insert Edges (Two directed rows per connection)\nINSERT INTO edges (source, target, weight, is_accessible, edge_type) VALUES\n${edgeValuesArray.join(",\n")};`;
     }
 
     console.log(sql);
     alert("SQL generated in browser console!");
+  };
+
+  // Helper to determine line color
+  const getEdgeColor = (edge) => {
+    if (edge.is_accessible_fwd && edge.is_accessible_bwd) return 'rgba(46, 204, 113, 0.8)'; // Green (Two-way)
+    if (!edge.is_accessible_fwd && !edge.is_accessible_bwd) return 'rgba(231, 76, 60, 0.8)'; // Red (Blocked)
+    return 'rgba(243, 156, 18, 0.9)'; // Orange (One-way)
   };
 
   return (
@@ -164,14 +204,14 @@ export default function App() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }}>
-          <strong>3. Next Edge Settings</strong>
+          <strong>3. Default Edge Settings</strong>
           <label>Type:
             <select value={currentEdgeType} onChange={(e) => setCurrentEdgeType(e.target.value)} style={{ marginLeft: '5px' }}>
               <option value="walkway">Walkway</option>
               <option value="staircase">Staircase</option>
             </select>
           </label>
-          <label><input type="checkbox" checked={currentIsAccessible} onChange={(e) => setCurrentIsAccessible(e.target.checked)} /> is_accessible</label>
+          <label><input type="checkbox" checked={currentIsAccessible} onChange={(e) => setCurrentIsAccessible(e.target.checked)} /> Default Accessible (2-Way)</label>
         </div>
 
         {imageUrl && (
@@ -190,16 +230,75 @@ export default function App() {
             <img ref={imgRef} src={imageUrl} alt="Floorplan" onClick={handleCanvasClick} style={{ cursor: mode === 'ADD_NODE' ? 'crosshair' : 'default', display: 'block' }} />
 
             <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-              {edges.map((edge, index) => {
+              {edges.map((edge) => {
                 const sourceNode = nodes.find(n => n.id === edge.source);
                 const targetNode = nodes.find(n => n.id === edge.target);
                 if (!sourceNode || !targetNode) return null;
-                const edgeColor = edge.is_accessible ? 'rgba(46, 204, 113, 0.8)' : 'rgba(231, 76, 60, 0.8)';
+
                 return (
-                  <line key={index} x1={sourceNode.x} y1={sourceNode.y} x2={targetNode.x} y2={targetNode.y} stroke={edgeColor} strokeWidth="4" />
+                  <g key={edge.id} style={{ pointerEvents: 'stroke' }}>
+                    {/* The Visible Line */}
+                    <line x1={sourceNode.x} y1={sourceNode.y} x2={targetNode.x} y2={targetNode.y} stroke={getEdgeColor(edge)} strokeWidth="4" />
+
+                    {/* The Invisible Thick Line (Acts as a large hitbox for mouse hover) */}
+                    <line
+                      x1={sourceNode.x} y1={sourceNode.y} x2={targetNode.x} y2={targetNode.y}
+                      stroke="transparent" strokeWidth="25"
+                      onMouseEnter={() => setHoveredEdgeId(edge.id)}
+                      onMouseLeave={() => setHoveredEdgeId(null)}
+                    />
+                  </g>
                 );
               })}
             </svg>
+
+            {/* EDGE HOVER MENU: Rendered as HTML over the SVG for UI controls */}
+            {edges.map((edge) => {
+              if (hoveredEdgeId !== edge.id) return null;
+
+              const sourceNode = nodes.find(n => n.id === edge.source);
+              const targetNode = nodes.find(n => n.id === edge.target);
+              if (!sourceNode || !targetNode) return null;
+
+              // Calculate midpoint to place the popup
+              const midX = (sourceNode.x + targetNode.x) / 2;
+              const midY = (sourceNode.y + targetNode.y) / 2;
+
+              return (
+                <div
+                  key={`menu-${edge.id}`}
+                  onMouseEnter={() => setHoveredEdgeId(edge.id)} // Keeps menu open if mouse moves slightly off the line
+                  onMouseLeave={() => setHoveredEdgeId(null)}
+                  style={{
+                    position: 'absolute',
+                    left: midX,
+                    top: midY,
+                    transform: 'translate(-50%, -50%)',
+                    background: 'rgba(255, 255, 255, 0.95)',
+                    border: '1px solid #34495e',
+                    borderRadius: '6px',
+                    padding: '8px',
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+                    zIndex: 60,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    pointerEvents: 'all' // Allows clicking the checkboxes
+                  }}
+                >
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={edge.is_accessible_fwd} onChange={(e) => toggleEdgeAccess(e, edge.id, 'fwd')} />
+                    Fwd: Node {edge.source} ➔ {edge.target}
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={edge.is_accessible_bwd} onChange={(e) => toggleEdgeAccess(e, edge.id, 'bwd')} />
+                    Bwd: Node {edge.target} ➔ {edge.source}
+                  </label>
+                </div>
+              );
+            })}
 
             {nodes.map((node) => (
               <div
@@ -223,13 +322,12 @@ export default function App() {
                   zIndex: hoveredNodeId === node.id ? 50 : 10
                 }}
               >
-                {/* CONDITIONAL RENDER: Only show label if this exact node is hovered */}
                 {hoveredNodeId === node.id && (
                   <span style={{
                     position: 'absolute',
                     top: '-28px',
                     left: '50%',
-                    transform: 'translateX(-50%)', // Centers the label directly above the dot
+                    transform: 'translateX(-50%)',
                     background: 'rgba(255,255,255,0.95)',
                     padding: '4px 8px',
                     fontSize: '12px',
@@ -238,7 +336,7 @@ export default function App() {
                     fontWeight: 'bold',
                     border: '1px solid #ccc',
                     boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                    pointerEvents: 'none' // Prevents the label from interrupting mouse clicks
+                    pointerEvents: 'none'
                   }}>
                     {node.id}: {node.name}
                   </span>
