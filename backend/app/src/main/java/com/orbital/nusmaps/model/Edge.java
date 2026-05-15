@@ -2,6 +2,8 @@ package com.orbital.nusmaps.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -18,11 +20,11 @@ public class Edge {
     private Integer edge_id;
 
     @ManyToOne
-    @JoinColumn(name = "node_id", nullable = false)
+    @JoinColumn(name = "source_node_id", nullable = false)
     private Node source;
 
     @ManyToOne
-    @JoinColumn(name = "node_id", nullable = false)
+    @JoinColumn(name = "target_node_id", nullable = false)
     private Node target;
 
     @Column(name = "weight")
@@ -31,8 +33,14 @@ public class Edge {
     @Column(name = "is_accessible")
     private Boolean is_accessible;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "edge_type")
-    private String edge_type;
+    private EdgeType edge_type;
+
+    public enum EdgeType {
+        Walkway,
+        Staircase
+    }
 
     public Edge () {}
 
@@ -42,7 +50,7 @@ public class Edge {
             Node target,
             Float weight,
             Boolean is_accessible,
-            String edge_type
+            EdgeType edge_type
         ) {
         this.edge_id = edge_id;
         this.source = source;
@@ -58,7 +66,7 @@ public class Edge {
         return edge_id;
     }
 
-    public void setNodeId(Integer edge_id) {
+    public void setEdgeId(Integer edge_id) {
         this.edge_id = edge_id;
     }
 
@@ -94,11 +102,11 @@ public class Edge {
         this.is_accessible = is_accessible;
     }
 
-    public String getEdgeType() {
+    public EdgeType getEdgeType() {
         return edge_type;
     }
 
-    public void setEdgeType(String edge_type) {
+    public void setEdgeType(EdgeType edge_type) {
         this.edge_type = edge_type;
     }
 }

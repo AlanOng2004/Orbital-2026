@@ -5,6 +5,8 @@ import java.util.List;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -24,8 +26,9 @@ public class Node {
     @Column(name = "node_name")
     private String node_name;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "node_type")
-    private String node_type;
+    private NodeType node_type;
 
     @ManyToOne
     @JoinColumn(name = "floorplan_id", nullable = false)
@@ -37,15 +40,24 @@ public class Node {
     @Column(name = "y_coordinate")
     private Float y_coordinate;
 
-    @OneToMany(mappedBy = "node")
-    private List<Edge> edges = new ArrayList<>();
+    @OneToMany(mappedBy = "source")
+    private List<Edge> outgoing_edges = new ArrayList<>();
+
+    @OneToMany(mappedBy = "target")
+    private List<Edge> incoming_edges = new ArrayList<>();
+
+    public enum NodeType {
+        Door,
+        Joints,
+        Staircase
+    }
 
     public Node () {}
 
     public Node(
             Integer node_id,
             String node_name,
-            String node_type,
+            NodeType node_type,
             Floorplan floorplan,
             Float x_coordinate,
             Float y_coordinate
@@ -76,11 +88,11 @@ public class Node {
         this.node_name = node_name;
     }
 
-    public String getNodeType() {
+    public NodeType getNodeType() {
         return node_type;
     }
 
-    public void setNodeType(String node_type) {
+    public void setNodeType(NodeType node_type) {
         this.node_type = node_type;
     }
 
@@ -108,11 +120,19 @@ public class Node {
         this.y_coordinate = y_coordinate;
     }
 
-    public List<Edge> getEdges() {
-        return edges;
+    public List<Edge> getOutgoingEdges() {
+        return outgoing_edges;
     }
 
-    public void setEdges(List<Edge> edges) {
-        this.edges = edges;
+    public void setOutgoingEdges(List<Edge> outgoing_edges) {
+        this.outgoing_edges = outgoing_edges;
+    }
+
+    public List<Edge> getIncomingEdges() {
+        return incoming_edges;
+    }
+
+    public void setIncomingEdges(List<Edge> incoming_edges) {
+        this.incoming_edges = incoming_edges;
     }
 }
