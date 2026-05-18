@@ -2,3 +2,4 @@
 /Users/alanong/Documents/GitHub/Orbital-2026/backend/app/src/main/java/com/orbital/nusmaps/model/Edge.java
 /Users/alanong/Documents/GitHub/Orbital-2026/backend/app/src/main/java/com/orbital/nusmaps/model/Floorplan.java
 /Users/alanong/Documents/GitHub/Orbital-2026/backend/app/src/main/java/com/orbital/nusmaps/model/Node.java
+/Users/alanong/Documents/GitHub/Orbital-2026/backend/app/src/main/java/com/orbital/nusmaps/repository/FloorplanRepository.java

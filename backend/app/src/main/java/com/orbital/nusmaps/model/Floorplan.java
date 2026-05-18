@@ -1,6 +1,8 @@
 package com.orbital.nusmaps.model;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.Column;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -30,7 +32,8 @@ public class Floorplan {
     @Column(name = "image_url")
     private String image_url;
 
-    @OneToMany(mappedBy = "floorplan")
+    @JsonManagedReference
+    @OneToMany(mappedBy = "floorplan", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Node> nodes = new ArrayList<>();
 
     public Floorplan () {}
@@ -96,6 +99,28 @@ public class Floorplan {
     }
 
     public void setNodes(List<Node> nodes) {
-        this.nodes = nodes;
+        this.nodes.clear();
+        if (nodes == null) {
+            return;
+        }
+        for (Node node : nodes) {
+            addNode(node);
+        }
+    }
+
+    public void addNode(Node node) {
+        if (node == null) {
+            return;
+        }
+        nodes.add(node);
+        node.setFloorplan(this);
+    }
+
+    public void removeNode(Node node) {
+        if (node == null) {
+            return;
+        }
+        nodes.remove(node);
+        node.setFloorplan(null);
     }
 }

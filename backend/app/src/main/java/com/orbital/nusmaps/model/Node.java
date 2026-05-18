@@ -1,5 +1,7 @@
 package com.orbital.nusmaps.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,6 +32,7 @@ public class Node {
     @Column(name = "node_type")
     private NodeType node_type;
 
+    @JsonBackReference
     @ManyToOne
     @JoinColumn(name = "floorplan_id", nullable = false)
     private Floorplan floorplan;
@@ -40,9 +43,11 @@ public class Node {
     @Column(name = "y_coordinate")
     private Float y_coordinate;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "source")
     private List<Edge> outgoing_edges = new ArrayList<>();
 
+    @JsonIgnore
     @OneToMany(mappedBy = "target")
     private List<Edge> incoming_edges = new ArrayList<>();
 
