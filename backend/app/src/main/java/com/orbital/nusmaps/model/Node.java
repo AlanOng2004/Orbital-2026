@@ -1,5 +1,7 @@
 package com.orbital.nusmaps.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,30 +23,33 @@ public class Node {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer node_id;
+    private Integer nodeId;
 
     @Column(name = "node_name")
-    private String node_name;
+    private String nodeName;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "node_type")
-    private NodeType node_type;
+    private NodeType nodeType;
 
+    @JsonBackReference
     @ManyToOne
     @JoinColumn(name = "floorplan_id", nullable = false)
     private Floorplan floorplan;
 
     @Column(name = "x_coordinate")
-    private Float x_coordinate;
+    private Float xCoordinate;
 
     @Column(name = "y_coordinate")
-    private Float y_coordinate;
+    private Float yCoordinate;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "source")
-    private List<Edge> outgoing_edges = new ArrayList<>();
+    private List<Edge> outgoingEdges = new ArrayList<>();
 
+    @JsonIgnore
     @OneToMany(mappedBy = "target")
-    private List<Edge> incoming_edges = new ArrayList<>();
+    private List<Edge> incomingEdges = new ArrayList<>();
 
     public enum NodeType {
         Door,
@@ -55,45 +60,45 @@ public class Node {
     public Node () {}
 
     public Node(
-            Integer node_id,
-            String node_name,
-            NodeType node_type,
+            Integer nodeId,
+            String nodeName,
+            NodeType nodeType,
             Floorplan floorplan,
-            Float x_coordinate,
-            Float y_coordinate
+            Float xCoordinate,
+            Float yCoordinate
         ) {
-        this.node_id = node_id;
-        this.node_name = node_name;
-        this.node_type = node_type;
+        this.nodeId = nodeId;
+        this.nodeName = nodeName;
+        this.nodeType = nodeType;
         this.floorplan = floorplan;
-        this.x_coordinate = x_coordinate;
-        this.y_coordinate = y_coordinate;
+        this.xCoordinate = xCoordinate;
+        this.yCoordinate = yCoordinate;
     }
 
     // ================= Getters and Setters =================
 
     public Integer getNodeId() {
-        return node_id;
+        return nodeId;
     }
 
-    public void setNodeId(Integer node_id) {
-        this.node_id = node_id;
+    public void setNodeId(Integer nodeId) {
+        this.nodeId = nodeId;
     }
 
     public String getNodeName() {
-        return node_name;
+        return nodeName;
     }
 
-    public void setNodeName(String node_name) {
-        this.node_name = node_name;
+    public void setNodeName(String nodeName) {
+        this.nodeName = nodeName;
     }
 
     public NodeType getNodeType() {
-        return node_type;
+        return nodeType;
     }
 
-    public void setNodeType(NodeType node_type) {
-        this.node_type = node_type;
+    public void setNodeType(NodeType nodeType) {
+        this.nodeType = nodeType;
     }
 
     public Floorplan getFloorplan() {
@@ -105,34 +110,34 @@ public class Node {
     }
 
     public Float getXCoordinate() {
-        return x_coordinate;
+        return xCoordinate;
     }
 
-    public void setXCoordinate(Float x_coordinate) {
-        this.x_coordinate = x_coordinate;
+    public void setXCoordinate(Float xCoordinate) {
+        this.xCoordinate = xCoordinate;
     }
 
     public Float getYCoordinate() {
-        return y_coordinate;
+        return yCoordinate;
     }
 
-    public void setYCoordinate(Float y_coordinate) {
-        this.y_coordinate = y_coordinate;
+    public void setYCoordinate(Float yCoordinate) {
+        this.yCoordinate = yCoordinate;
     }
 
     public List<Edge> getOutgoingEdges() {
-        return outgoing_edges;
+        return outgoingEdges;
     }
 
-    public void setOutgoingEdges(List<Edge> outgoing_edges) {
-        this.outgoing_edges = outgoing_edges;
+    public void setOutgoingEdges(List<Edge> outgoingEdges) {
+        this.outgoingEdges = outgoingEdges;
     }
 
     public List<Edge> getIncomingEdges() {
-        return incoming_edges;
+        return incomingEdges;
     }
 
-    public void setIncomingEdges(List<Edge> incoming_edges) {
-        this.incoming_edges = incoming_edges;
+    public void setIncomingEdges(List<Edge> incomingEdges) {
+        this.incomingEdges = incomingEdges;
     }
 }
