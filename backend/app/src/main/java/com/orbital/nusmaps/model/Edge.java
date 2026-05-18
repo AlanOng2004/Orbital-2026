@@ -17,7 +17,7 @@ public class Edge {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer edge_id;
+    private Integer edgeId;
 
     @ManyToOne
     @JoinColumn(name = "source_node_id", nullable = false)
@@ -31,11 +31,11 @@ public class Edge {
     private Float weight;
 
     @Column(name = "is_accessible")
-    private Boolean is_accessible;
+    private Boolean accessible;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "edge_type")
-    private EdgeType edge_type;
+    private EdgeType edgeType;
 
     public enum EdgeType {
         Walkway,
@@ -45,29 +45,29 @@ public class Edge {
     public Edge () {}
 
     public Edge(
-            Integer edge_id,
+            Integer edgeId,
             Node source,
             Node target,
             Float weight,
-            Boolean is_accessible,
-            EdgeType edge_type
+            Boolean accessible,
+            EdgeType edgeType
         ) {
-        this.edge_id = edge_id;
+        this.edgeId = edgeId;
         this.source = source;
         this.target = target;
         this.weight = weight;
-        this.is_accessible = is_accessible;
-        this.edge_type = edge_type;
+        this.accessible = accessible;
+        this.edgeType = edgeType;
     }
 
     // ================= Getters and Setters =================
 
     public Integer getEdgeId() {
-        return edge_id;
+        return edgeId;
     }
 
-    public void setEdgeId(Integer edge_id) {
-        this.edge_id = edge_id;
+    public void setEdgeId(Integer edgeId) {
+        this.edgeId = edgeId;
     }
 
     public Node getSource() {
@@ -94,19 +94,19 @@ public class Edge {
         this.weight = weight;
     }
 
-    public Boolean getIsAccessible() {
-        return is_accessible;
+    public Boolean getAccessible() {
+        return accessible;
     }
 
-    public void setIsAccessible(Boolean is_accessible) {
-        this.is_accessible = is_accessible;
+    public void setAccessible(Boolean accessible) {
+        this.accessible = accessible;
     }
 
     public EdgeType getEdgeType() {
-        return edge_type;
+        return edgeType;
     }
 
-    public void setEdgeType(EdgeType edge_type) {
-        this.edge_type = edge_type;
+    public void setEdgeType(EdgeType edgeType) {
+        this.edgeType = edgeType;
     }
 }

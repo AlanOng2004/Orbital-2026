@@ -18,19 +18,19 @@ public class Floorplan {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer floorplan_id;
+    private Integer floorplanId;
 
     @Column(name = "area_name")
-    private String area_name;
+    private String areaName;
 
     @Column(name = "building_name")
-    private String building_name;
+    private String buildingName;
 
     @Column(name = "level")
     private String level;
 
     @Column(name = "image_url")
-    private String image_url;
+    private String imageUrl;
 
     @JsonManagedReference
     @OneToMany(mappedBy = "floorplan", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -39,43 +39,43 @@ public class Floorplan {
     public Floorplan () {}
 
     public Floorplan(
-            Integer floorplan_id,
-            String area_name,
-            String building_name,
+            Integer floorplanId,
+            String areaName,
+            String buildingName,
             String level,
-            String image_url
+            String imageUrl
         ) {
-        this.floorplan_id = floorplan_id;
-        this.area_name = area_name;
-        this.building_name = building_name;
+        this.floorplanId = floorplanId;
+        this.areaName = areaName;
+        this.buildingName = buildingName;
         this.level = level;
-        this.image_url = image_url;
+        this.imageUrl = imageUrl;
     }
 
     // ================= Getters and Setters =================
 
     public Integer getFloorplanId() {
-        return floorplan_id;
+        return floorplanId;
     }
 
-    public void setFloorplanId(Integer floorplan_id) {
-        this.floorplan_id = floorplan_id;
+    public void setFloorplanId(Integer floorplanId) {
+        this.floorplanId = floorplanId;
     }
 
     public String getAreaName() {
-        return area_name;
+        return areaName;
     }
 
-    public void setAreaName(String area_name) {
-        this.area_name = area_name;
+    public void setAreaName(String areaName) {
+        this.areaName = areaName;
     }
 
     public String getBuildingName() {
-        return building_name;
+        return buildingName;
     }
 
-    public void setBuildingName(String building_name) {
-        this.building_name = building_name;
+    public void setBuildingName(String buildingName) {
+        this.buildingName = buildingName;
     }
 
     public String getLevel(){
@@ -87,11 +87,11 @@ public class Floorplan {
     }
 
     public String getImageUrl() {
-        return image_url;
+        return imageUrl;
     }
 
-    public void setImageUrl(String image_url) {
-        this.image_url = image_url;
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
     }
 
     public List<Node> getNodes() {
