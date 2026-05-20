@@ -1,0 +1,678 @@
+.viewer {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #ffffff;
+  color: #101418;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  touch-action: none;
+}
+
+.mapStage {
+  position: absolute;
+  overflow: hidden;
+  cursor: grab;
+  border: 0;
+  background: #d7dde3;
+  box-sizing: border-box;
+}
+
+.mapStage:active {
+  cursor: grabbing;
+}
+
+.mapPlane {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+
+.mapPlane--active {
+  transition: none;
+}
+
+.campusMap {
+  position: absolute;
+  display: block;
+  max-width: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.viewer--map-page .mapPlane {
+  filter: grayscale(0.95) opacity(0.38);
+}
+
+.topChrome {
+  position: absolute;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(820px, calc(100vw - 48px));
+  pointer-events: none;
+}
+
+.searchShell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(320px, calc(100vw - 48px));
+  height: 30px;
+  padding: 0 12px;
+  border: 2px solid #1b2f42;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 22px rgba(23, 37, 52, 0.12);
+  pointer-events: auto;
+  backdrop-filter: blur(12px);
+}
+
+.searchIcon {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #51606f;
+  border-radius: 50%;
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.searchIcon::after {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 2px;
+  right: -6px;
+  bottom: -3px;
+  border-radius: 2px;
+  background: #51606f;
+  transform: rotate(45deg);
+}
+
+.searchShell input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #111827;
+  font-size: 16px;
+}
+
+.resultList {
+  position: absolute;
+  top: 42px;
+  left: 0;
+  width: min(300px, calc(100vw - 48px));
+  overflow: hidden;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18px 45px rgba(23, 37, 52, 0.18);
+  pointer-events: auto;
+}
+
+.resultList button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 18px;
+  border: 0;
+  border-bottom: 1px solid rgba(17, 24, 39, 0.08);
+  background: transparent;
+  color: #121820;
+  cursor: pointer;
+  text-align: left;
+}
+
+.resultList button:hover {
+  background: #edf6fb;
+}
+
+.resultList small {
+  color: #4f6f7f;
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.quickActions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.quickActions button {
+  min-width: 92px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 2px solid #1b2f42;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #15202b;
+  font-size: 12px;
+  box-shadow: 0 8px 18px rgba(23, 37, 52, 0.12);
+  cursor: pointer;
+}
+
+.menuHandle {
+  position: absolute;
+  z-index: 45;
+  min-width: 34px;
+  height: 58px;
+  border: 1px solid #263846;
+  border-radius: 0 6px 6px 0;
+  background: rgba(255, 255, 255, 0.94);
+  color: #172535;
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(23, 37, 52, 0.12);
+  cursor: pointer;
+}
+
+.sideMenu {
+  position: absolute;
+  z-index: 35;
+  padding: 16px 18px;
+  overflow: auto;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid #263846;
+  box-shadow: none;
+  box-sizing: border-box;
+  transform: translateX(-102%);
+  transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sideMenu.isOpen {
+  transform: translateX(0);
+}
+
+.sideMenu header {
+  width: 100%;
+  min-height: 76px;
+  padding: 10px 8px;
+  border: 1px solid #263846;
+  border-radius: 10px;
+  font-size: 18px;
+  box-sizing: border-box;
+}
+
+.sideMenu header strong {
+  display: block;
+  font-weight: 500;
+}
+
+.sideMenu header::after {
+  content: "<account details>";
+  display: block;
+  margin-top: 4px;
+}
+
+.sideMenu section {
+  padding: 18px 6px;
+  border-bottom: 0;
+}
+
+.sideMenu h2 {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.historyBlock {
+  margin-top: 26px;
+}
+
+.historyBlock button {
+  display: none;
+}
+
+.menuDropdown > button {
+  display: block;
+  width: 100%;
+  min-height: 24px;
+  border: 0;
+  background: transparent;
+  color: #101418;
+  font-size: 16px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menuDropdown > button span {
+  display: inline-block;
+  width: 24px;
+  margin-right: 8px;
+}
+
+.menuDropdownList {
+  margin: 4px 0 8px 34px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(17, 24, 39, 0.16);
+}
+
+.menuDropdownList.isScrollable {
+  max-height: 244px;
+  overflow: auto;
+}
+
+.menuDropdownList button {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  border: 0;
+  background: transparent;
+  color: #25313d;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sideMenu label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  font-size: 14px;
+}
+
+.locateButton {
+  position: absolute;
+  z-index: 25;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(17, 24, 39, 0.13);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 10px 24px rgba(23, 37, 52, 0.18);
+  cursor: pointer;
+}
+
+.locateButton span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #8a949e;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.locateButton span::before,
+.locateButton span::after {
+  content: "";
+  position: absolute;
+  background: #9aa3ad;
+}
+
+.locateButton span::before {
+  left: 7px;
+  top: -6px;
+  width: 2px;
+  height: 28px;
+  background: #8a949e;
+}
+
+.locateButton span::after {
+  left: -6px;
+  top: 7px;
+  width: 28px;
+  height: 2px;
+  background: #8a949e;
+}
+
+.locateButton--enabled span,
+.locateButton--enabled span::before,
+.locateButton--enabled span::after {
+  border-color: #1477d4;
+  background: #1477d4;
+}
+
+.locateButton--enabled span {
+  background: transparent;
+}
+
+.rotationDial {
+  position: absolute;
+  z-index: 25;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  touch-action: none;
+  cursor: grab;
+}
+
+.rotationDial:active {
+  cursor: grabbing;
+}
+
+.torusRing {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 34px;
+  height: 34px;
+  border: 3px solid rgba(255, 255, 255, 0.98);
+  border-radius: 50%;
+  box-shadow:
+    0 4px 14px rgba(17, 24, 39, 0.2),
+    inset 0 0 0 1px rgba(17, 24, 39, 0.1);
+  transform: translate(-50%, -50%);
+}
+
+.dialMarker {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  margin-left: -8px;
+  margin-top: -8px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: #1477d4;
+  box-shadow: 0 3px 12px rgba(20, 119, 212, 0.35);
+  pointer-events: none;
+}
+
+.compassButton {
+  position: absolute;
+  z-index: 25;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 10px 24px rgba(23, 37, 52, 0.18);
+  cursor: pointer;
+}
+
+.compassNeedle {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: start center;
+  color: #1477d4;
+  font-size: 23px;
+  font-weight: 900;
+  line-height: 1;
+  transform-origin: 50% 50%;
+  pointer-events: none;
+}
+
+.compassButton strong {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  color: #1f2933;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  transform: translate(-50%, -42%);
+  pointer-events: none;
+}
+
+.scaleOverlay {
+  position: absolute;
+  z-index: 24;
+  height: 42px;
+  pointer-events: none;
+}
+
+.scaleLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 22px;
+  background:
+    linear-gradient(#111111, #111111) 0 0 / 12.5% 2px no-repeat,
+    linear-gradient(#111111, #111111) 25% 0 / 25% 2px no-repeat,
+    linear-gradient(#111111, #111111) 75% 0 / 25% 2px no-repeat,
+    linear-gradient(#111111, #111111) 0 20px / 100% 2px no-repeat;
+}
+
+.scaleLine span {
+  position: absolute;
+  bottom: 0;
+  width: 2px;
+  height: 20px;
+  background: #111111;
+  transform: translateX(-50%);
+}
+
+.scaleLine span:nth-child(2),
+.scaleLine span:nth-child(4) {
+  height: 12px;
+}
+
+.scaleLabels {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 21px;
+  height: 18px;
+  color: #111111;
+  font-size: 15px;
+  line-height: 18px;
+}
+
+.scaleLabels span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.scaleLabels strong {
+  position: absolute;
+  right: -50px;
+  top: -18px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.legendOverlay {
+  position: absolute;
+  z-index: 24;
+  width: 136px;
+  padding: 5px 7px;
+  background: rgba(255, 255, 255, 0.76);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.legendOverlay div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 20px;
+}
+
+.legendOverlay span {
+  width: 34px;
+  height: 16px;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+}
+
+.legendOverlay p {
+  margin: 0;
+  color: #486a9c;
+  font-size: 13px;
+  line-height: 16px;
+}
+
+.buildingHotspot {
+  position: absolute;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.buildingHotspot:focus-visible {
+  outline: 5px solid #0876d8;
+  outline-offset: 3px;
+}
+
+.escHint {
+  margin: 4px 0 0 24px;
+  font-size: 13px;
+}
+
+.uiHiddenPrompt {
+  position: absolute;
+  left: 50%;
+  top: 22px;
+  z-index: 60;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(17, 24, 39, 0.82);
+  color: #ffffff;
+  font-size: 14px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.mapHighlight {
+  position: absolute;
+  border: 5px solid #0876d8;
+  border-radius: 8px;
+  background: rgba(8, 118, 216, 0.16);
+  box-shadow: 0 0 0 7px rgba(255, 255, 255, 0.72);
+  pointer-events: none;
+}
+
+.mapHighlight--faculty {
+  border-color: #008c7a;
+  background: rgba(0, 140, 122, 0.16);
+}
+
+.floorOverlay {
+  position: absolute;
+  z-index: 18;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 84px 84px 34px 34px;
+  background: rgba(16, 20, 24, 0.42);
+}
+
+.floorSheet {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(1120px, calc(100% - 90px));
+  max-height: calc(100% - 96px);
+}
+
+.floorTitle {
+  position: absolute;
+  left: 0;
+  top: -34px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #172535;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 26px;
+  box-shadow: 0 8px 20px rgba(23, 37, 52, 0.18);
+}
+
+.floorViewport {
+  position: relative;
+  overflow: hidden;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(16, 24, 32, 0.34);
+}
+
+.floorViewport img {
+  display: block;
+  width: min(1120px, calc(100vw - 190px));
+  max-height: calc(100vh - 150px);
+  object-fit: contain;
+  user-select: none;
+}
+
+.roomHighlight {
+  position: absolute;
+  border: 4px solid #1277d4;
+  border-radius: 6px;
+  background: rgba(18, 119, 212, 0.18);
+  box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.65);
+  pointer-events: none;
+}
+
+.floorStack {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-left: 10px;
+}
+
+.floorStack button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  border-radius: 50%;
+  background: #ffffff;
+  color: #172535;
+  font-weight: 800;
+  box-shadow: 0 10px 24px rgba(23, 37, 52, 0.2);
+  cursor: pointer;
+}
+
+.floorStack button.isActive {
+  background: #1477d4;
+  color: #ffffff;
+}
+
+@media (max-width: 720px) {
+  .quickActions {
+    width: min(420px, calc(100vw - 36px));
+    flex-wrap: wrap;
+  }
+
+  .quickActions button {
+    flex: 1 1 calc(50% - 8px);
+  }
+
+  .menuHandle {
+    top: auto;
+    right: 18px;
+    bottom: 244px;
+  }
+
+  .locateButton {
+    right: 28px;
+    bottom: 126px;
+  }
+
+  .rotationDial {
+    width: 86px;
+    height: 86px;
+  }
+
+  .floorOverlay {
+    padding: 96px 18px 20px;
+  }
+
+  .floorSheet {
+    width: calc(100vw - 36px);
+  }
+
+  .floorViewport img {
+    width: calc(100vw - 98px);
+  }
+}
