@@ -60,12 +60,6 @@
             class="flex h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-900">
         </div>
 
-        <div class="space-y-1.5">
-          <label class="block text-xs font-medium text-gray-500">Confirm password</label>
-          <input id="confirmPassword" type="password" placeholder="Repeat your password"
-            class="flex h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-900">
-        </div>
-
         <button id="submitBtn" type="submit"
           class="inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-900 bg-gray-900 text-white hover:bg-gray-800 h-11 w-full mt-2 disabled:opacity-50">
           Create account
@@ -85,7 +79,6 @@
     const usernameInput = document.getElementById('username');
     const genderInput = document.getElementById('gender');
     const passwordInput = document.getElementById('password');
-    const confirmPasswordInput = document.getElementById('confirmPassword');
     const errorMsg = document.getElementById('errorMessage');
     const submitBtn = document.getElementById('submitBtn');
 
@@ -95,16 +88,9 @@
       const username = usernameInput.value.trim();
       const gender = genderInput.value;
       const password = passwordInput.value;
-      const confirmPassword = confirmPasswordInput.value;
 
-      if (!username || !password || !confirmPassword) {
-        errorMsg.textContent = 'Please fill in username, password, and confirm password.';
-        errorMsg.classList.remove('hidden');
-        return;
-      }
-
-      if (password !== confirmPassword) {
-        errorMsg.textContent = 'Passwords do not match.';
+      if (!username || !password || !gender) {
+        errorMsg.textContent = 'Please fill in username, password, and gender.';
         errorMsg.classList.remove('hidden');
         return;
       }
@@ -123,7 +109,7 @@
           body: JSON.stringify({
             username,
             password,
-            gender: gender || null
+            gender
           })
         });
 

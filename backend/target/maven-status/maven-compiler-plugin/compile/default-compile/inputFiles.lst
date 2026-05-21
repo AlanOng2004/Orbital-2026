@@ -1,4 +1,5 @@
 /Users/alanong/Documents/GitHub/Orbital-2026/backend/src/main/java/com/orbital/nusmaps/Backend.java
+/Users/alanong/Documents/GitHub/Orbital-2026/backend/src/main/java/com/orbital/nusmaps/config/AdminAccountInitializer.java
 /Users/alanong/Documents/GitHub/Orbital-2026/backend/src/main/java/com/orbital/nusmaps/config/DotEnvEnvironmentPostProcessor.java
 /Users/alanong/Documents/GitHub/Orbital-2026/backend/src/main/java/com/orbital/nusmaps/config/JwtAuthenticationFilter.java
 /Users/alanong/Documents/GitHub/Orbital-2026/backend/src/main/java/com/orbital/nusmaps/config/PasswordConfig.java

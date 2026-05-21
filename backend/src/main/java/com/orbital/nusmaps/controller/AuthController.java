@@ -48,10 +48,7 @@ public class AuthController {
         newUser.setUsername(request.getUsername());
         newUser.setPassword(request.getPassword());
         newUser.setIsAdmin(Boolean.TRUE.equals(request.getIsAdmin()));
-
-        if (request.getGender() != null && !request.getGender().isBlank()) {
-            newUser.setGender(User.Gender.valueOf(request.getGender().trim()));
-        }
+        newUser.setGender(parseGender(request.getGender()));
 
         User savedUser = registerService.register(newUser);
         return buildAuthResponse(savedUser);
@@ -83,5 +80,19 @@ public class AuthController {
             Boolean.TRUE.equals(user.getIsAdmin()),
             user.getCreatedAt()
         );
+    }
+
+    private User.Gender parseGender(String gender) {
+        if (gender == null || gender.isBlank()) {
+            throw new IllegalArgumentException("Gender is required.");
+        }
+
+        for (User.Gender value : User.Gender.values()) {
+            if (value.name().equalsIgnoreCase(gender.trim())) {
+                return value;
+            }
+        }
+
+        throw new IllegalArgumentException("Invalid gender value.");
     }
 }
