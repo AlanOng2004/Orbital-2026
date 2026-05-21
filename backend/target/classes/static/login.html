@@ -28,7 +28,7 @@
 <body class="min-h-screen flex items-center justify-center px-4 bg-gray-50 text-gray-900">
   <div class="w-full max-w-sm animate-fade-in opacity-0">
     <div class="text-center mb-8">
-      <img src="https://media.base44.com/images/public/69ef0381f208807500b0f2ee/d29303e14_.png" alt="NUSMaps"
+      <img src="img/NUSmaps.png" alt="NUSMaps"
         class="h-48 mx-auto mb-5">
       <h1 class="text-2xl font-semibold tracking-tight">NUSMaps</h1>
     </div>
@@ -110,7 +110,7 @@
 
         // 3. Route based on your database role string
         setTimeout(() => {
-          if (data.user.role === 'Admin') {
+          if (data.user.isAdmin) {
             window.location.href = '/annotator.html';
           } else {
             window.location.href = '/index.html';
