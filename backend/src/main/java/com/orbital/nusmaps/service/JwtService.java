@@ -16,6 +16,7 @@ import com.orbital.nusmaps.model.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.io.DecodingException;
 import io.jsonwebtoken.security.Keys;
 
 @Service
@@ -92,7 +93,7 @@ public class JwtService {
     private byte[] decodeSecret(String secret) {
         try {
             return Decoders.BASE64.decode(secret);
-        } catch (IllegalArgumentException ignored) {
+        } catch (IllegalArgumentException | DecodingException ignored) {
             return secret.getBytes(StandardCharsets.UTF_8);
         }
     }
