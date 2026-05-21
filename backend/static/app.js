@@ -1,5 +1,5 @@
 const MAP = {
-  src: "Kent-Ridge-Campus-Map.jpg",
+  src: "img/Kent-Ridge-Campus-Map.jpg",
   sourceWidth: 3308,
   sourceHeight: 2339,
   cropX: 90,
