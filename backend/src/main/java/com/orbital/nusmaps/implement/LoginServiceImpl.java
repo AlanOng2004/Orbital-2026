@@ -1,4 +1,4 @@
-package com.orbital.nusmaps.service.impl;
+package com.orbital.nusmaps.implement;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
