@@ -8,3 +8,6 @@
 /Users/alanong/Documents/GitHub/Orbital-2026/backend/src/main/java/com/orbital/nusmaps/repository/EdgeRepository.java
 /Users/alanong/Documents/GitHub/Orbital-2026/backend/src/main/java/com/orbital/nusmaps/repository/FloorplanRepository.java
 /Users/alanong/Documents/GitHub/Orbital-2026/backend/src/main/java/com/orbital/nusmaps/repository/NodeRepository.java
+/Users/alanong/Documents/GitHub/Orbital-2026/backend/src/main/java/com/orbital/nusmaps/repository/UserRepository.java
+/Users/alanong/Documents/GitHub/Orbital-2026/backend/src/main/java/com/orbital/nusmaps/service/LoginService.java
+/Users/alanong/Documents/GitHub/Orbital-2026/backend/src/main/java/com/orbital/nusmaps/service/RegisterService.java

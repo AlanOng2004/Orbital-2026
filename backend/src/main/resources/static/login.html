@@ -110,7 +110,7 @@
 
         // 3. Route based on your database role string
         setTimeout(() => {
-          if (data.user.role === 'Admin') {
+          if (data.user.isAdmin) {
             window.location.href = '/annotator.html';
           } else {
             window.location.href = '/index.html';
