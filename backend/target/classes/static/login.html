@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ECPC Overwatch - Login</title>
+  <title>NUSMaps - Login</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @keyframes fadeIn {
@@ -55,6 +55,15 @@
           Login
         </button>
       </form>
+
+      <div class="mt-4 flex items-center justify-between text-sm">
+        <a href="/forgot-password.html" class="font-medium text-gray-500 transition-colors hover:text-gray-900">
+          Forgot password?
+        </a>
+        <a href="/signup.html" class="font-medium text-gray-500 transition-colors hover:text-gray-900">
+          Sign up
+        </a>
+      </div>
     </div>
   </div>
 
@@ -64,6 +73,17 @@
     const passwordInput = document.getElementById('password');
     const errorMsg = document.getElementById('errorMessage');
     const submitBtn = document.getElementById('submitBtn');
+
+    const existingSession = localStorage.getItem('points_app_session');
+    if (existingSession) {
+      try {
+        const user = JSON.parse(existingSession);
+        window.location.href = user.isAdmin ? '/annotator.html' : '/index.html';
+      } catch (err) {
+        localStorage.removeItem('points_app_session');
+        localStorage.removeItem('jwt_token');
+      }
+    }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
