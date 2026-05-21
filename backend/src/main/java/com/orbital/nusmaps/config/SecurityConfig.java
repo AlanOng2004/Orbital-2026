@@ -28,6 +28,8 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/",
                     "/login.html",
+                    "/signup.html",
+                    "/forgot-password.html",
                     "/index.html",
                     "/app.js",
                     "/app.css",
