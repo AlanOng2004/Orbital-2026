@@ -125,7 +125,7 @@
           token: data.token
         }));
 
-        window.location.href = data.user.isAdmin ? '/annotator.html' : '/index.html';
+        window.location.href = data.user.isAdmin ? '/annotator/index.html' : '/index.html';
       } catch (err) {
         errorMsg.textContent = err.message || 'Unable to create account.';
         errorMsg.classList.remove('hidden');

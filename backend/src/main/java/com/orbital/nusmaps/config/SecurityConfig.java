@@ -31,6 +31,8 @@ public class SecurityConfig {
                     "/signup.html",
                     "/forgot-password.html",
                     "/index.html",
+                    "/annotator.html",
+                    "/annotator/**",
                     "/app.js",
                     "/app.css",
                     "/img/**",
