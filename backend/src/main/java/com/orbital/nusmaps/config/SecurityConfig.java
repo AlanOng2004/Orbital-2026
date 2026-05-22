@@ -35,8 +35,6 @@ public class SecurityConfig {
                     "/annotator/**",
                     "/app.js",
                     "/app.css",
-                    "/annotator.js",
-                    "/annotator.css",
                     "/img/**",
                     "/h2-console/**",
                     "/api/auth/**",
