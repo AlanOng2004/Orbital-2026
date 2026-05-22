@@ -4,87 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Map Annotator</title>
-    <link rel="stylesheet" href="./annotator.css" />
+    <meta http-equiv="refresh" content="0; url=/annotator/index.html" />
   </head>
   <body>
-    <div class="annotator-app">
-      <header class="toolbar">
-        <section class="panel panel-core">
-          <strong>1. Core Tools</strong>
-          <input id="imageUpload" type="file" accept="image/*" />
-
-          <div class="button-row">
-            <button id="addNodeBtn" class="mode-button is-active" type="button">Add Nodes</button>
-            <button id="addEdgeBtn" class="mode-button" type="button">Connect Edges</button>
-          </div>
-
-          <div class="button-row">
-            <button id="undoBtn" class="warn-button" type="button">Undo Last</button>
-            <button id="clearBtn" class="danger-button" type="button">Clear All</button>
-          </div>
-
-          <button id="generateSqlBtn" class="primary-button" type="button">Generate SQL</button>
-        </section>
-
-        <section class="panel">
-          <strong>2. Next Node Settings</strong>
-          <label>
-            ID:
-            <input id="nextNodeId" type="number" min="1" value="1" />
-          </label>
-          <label>
-            Floorplan:
-            <input id="floorplanId" type="number" min="1" value="1" />
-          </label>
-          <label>
-            Name:
-            <input id="nodeName" type="text" value="Corridor" />
-          </label>
-          <label>
-            Type:
-            <select id="nodeType">
-              <option value="Door">Door</option>
-              <option value="Joints" selected>Joints</option>
-              <option value="Staircase">Staircase</option>
-            </select>
-          </label>
-        </section>
-
-        <section class="panel">
-          <strong>3. Default Edge Settings</strong>
-          <label>
-            Type:
-            <select id="edgeType">
-              <option value="walkway" selected>Walkway</option>
-              <option value="staircase">Staircase</option>
-            </select>
-          </label>
-          <label class="checkbox-label">
-            <input id="edgeAccessible" type="checkbox" checked />
-            Default Accessible (2-Way)
-          </label>
-        </section>
-
-        <section id="zoomPanel" class="panel zoom-panel is-hidden">
-          <strong id="zoomLabel">Zoom: 100%</strong>
-          <input id="zoomRange" type="range" min="0.2" max="3" step="0.1" value="1" />
-        </section>
-      </header>
-
-      <main id="canvasArea" class="canvas-area">
-        <div id="emptyState" class="empty-state">
-          Upload a floorplan image to start annotating.
-        </div>
-
-        <div id="canvasStage" class="canvas-stage is-hidden">
-          <img id="floorplanImage" alt="Floorplan" />
-          <svg id="edgeLayer" class="edge-layer"></svg>
-          <div id="nodeLayer" class="node-layer"></div>
-          <div id="edgeMenuLayer" class="edge-menu-layer"></div>
-        </div>
-      </main>
-    </div>
-
-    <script src="./annotator.js"></script>
+    <p>Redirecting to the annotator...</p>
   </body>
   </html>

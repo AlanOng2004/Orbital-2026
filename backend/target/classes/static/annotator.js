@@ -33,8 +33,6 @@
     selectedNodeId: null,
     zoom: 1,
     history: [],
-    hoveredNodeId: null,
-    hoveredEdgeId: null,
     currentNodeName: "Corridor",
     currentNodeType: "Joints",
     currentFloorplanId: 1,
@@ -42,6 +40,7 @@
     currentEdgeType: "walkway",
   };
 
+  let hoveredEdgeId = null;
   let hideEdgeMenuTimer = null;
   let uploadedImageObjectUrl = null;
 
@@ -117,8 +116,6 @@
     setState({
       imageUrl: nextUrl,
       zoom: 1,
-      hoveredNodeId: null,
-      hoveredEdgeId: null,
       selectedNodeId: null,
     });
   }
@@ -241,8 +238,6 @@
       nextNodeId: 1,
       nextEdgeId: 1,
       selectedNodeId: null,
-      hoveredNodeId: null,
-      hoveredEdgeId: null,
     });
   }
 
@@ -266,8 +261,7 @@
 
   function generateSql() {
     if (state.nodes.length === 0) {
-      window.alert("No nodes added yet.");
-      return;
+      return "No nodes added yet.";
     }
 
     const nodeValues = state.nodes
@@ -309,13 +303,15 @@
   function scheduleEdgeMenuHide() {
     clearEdgeMenuTimer();
     hideEdgeMenuTimer = window.setTimeout(() => {
-      setState({ hoveredEdgeId: null });
+      hoveredEdgeId = null;
+      renderEdgeMenu();
     }, 120);
   }
 
   function showEdgeMenu(edgeId) {
     clearEdgeMenuTimer();
-    setState({ hoveredEdgeId: edgeId });
+    hoveredEdgeId = edgeId;
+    renderEdgeMenu();
   }
 
   function renderControls() {
@@ -332,6 +328,7 @@
     elements.zoomRange.value = String(state.zoom);
     elements.zoomLabel.textContent = `Zoom: ${Math.round(state.zoom * 100)}%`;
     elements.zoomPanel.classList.toggle("is-hidden", !state.imageUrl);
+    elements.zoomPanel.style.marginLeft = state.imageUrl ? "auto" : "0";
   }
 
   function renderCanvas() {
@@ -415,18 +412,25 @@
       nodeElement.style.left = `${node.x - 8}px`;
       nodeElement.style.top = `${node.y - 8}px`;
       nodeElement.style.background = getNodeColor(node);
-      nodeElement.style.zIndex = state.hoveredNodeId === node.id ? "50" : "10";
+      nodeElement.style.cursor = state.mode === "ADD_EDGE" ? "pointer" : "default";
+      nodeElement.style.zIndex = "10";
 
       nodeElement.addEventListener("click", (event) => handleNodeClick(event, node.id));
-      nodeElement.addEventListener("mouseenter", () => setState({ hoveredNodeId: node.id }));
-      nodeElement.addEventListener("mouseleave", () => setState({ hoveredNodeId: null }));
-
-      if (state.hoveredNodeId === node.id) {
+      nodeElement.addEventListener("mouseenter", () => {
+        nodeElement.style.zIndex = "50";
         const label = document.createElement("span");
         label.className = "node-label";
         label.textContent = `${node.id}: ${node.name}`;
+        label.dataset.role = "node-label";
         nodeElement.appendChild(label);
-      }
+      });
+      nodeElement.addEventListener("mouseleave", () => {
+        nodeElement.style.zIndex = "10";
+        const label = nodeElement.querySelector('[data-role="node-label"]');
+        if (label) {
+          label.remove();
+        }
+      });
 
       elements.nodeLayer.appendChild(nodeElement);
     });
@@ -435,11 +439,11 @@
   function renderEdgeMenu() {
     elements.edgeMenuLayer.innerHTML = "";
 
-    if (state.hoveredEdgeId === null) {
+    if (hoveredEdgeId === null) {
       return;
     }
 
-    const edge = state.edges.find((entry) => entry.id === state.hoveredEdgeId);
+    const edge = state.edges.find((entry) => entry.id === hoveredEdgeId);
     if (!edge) {
       return;
     }
@@ -461,17 +465,23 @@
     const forwardInput = document.createElement("input");
     forwardInput.type = "checkbox";
     forwardInput.checked = edge.is_accessible_fwd;
-    forwardInput.addEventListener("change", () => toggleEdgeAccess(edge.id, "fwd"));
+    forwardInput.addEventListener("change", () => {
+      toggleEdgeAccess(edge.id, "fwd");
+      showEdgeMenu(edge.id);
+    });
     forwardLabel.appendChild(forwardInput);
-    forwardLabel.append(`Fwd: Node ${edge.source} -> ${edge.target}`);
+    forwardLabel.append(`Fwd: Node ${edge.source} ➔ ${edge.target}`);
 
     const backwardLabel = document.createElement("label");
     const backwardInput = document.createElement("input");
     backwardInput.type = "checkbox";
     backwardInput.checked = edge.is_accessible_bwd;
-    backwardInput.addEventListener("change", () => toggleEdgeAccess(edge.id, "bwd"));
+    backwardInput.addEventListener("change", () => {
+      toggleEdgeAccess(edge.id, "bwd");
+      showEdgeMenu(edge.id);
+    });
     backwardLabel.appendChild(backwardInput);
-    backwardLabel.append(`Bwd: Node ${edge.target} -> ${edge.source}`);
+    backwardLabel.append(`Bwd: Node ${edge.target} ➔ ${edge.source}`);
 
     menu.appendChild(forwardLabel);
     menu.appendChild(backwardLabel);

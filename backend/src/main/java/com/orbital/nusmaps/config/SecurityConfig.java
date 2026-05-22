@@ -32,6 +32,7 @@ public class SecurityConfig {
                     "/forgot-password.html",
                     "/index.html",
                     "/annotator.html",
+                    "/annotator/**",
                     "/app.js",
                     "/app.css",
                     "/annotator.js",

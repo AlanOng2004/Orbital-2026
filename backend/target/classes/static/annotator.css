@@ -1,6 +1,6 @@
 :root {
   color-scheme: light;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: sans-serif;
 }
 
 * {
@@ -10,7 +10,6 @@
 body {
   margin: 0;
   background: #95a5a6;
-  color: #111827;
 }
 
 button,
@@ -23,6 +22,14 @@ select {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  font-family: sans-serif;
+}
+
+.toolbar-shell {
+  display: flex;
+  justify-content: center;
+  background: #ecf0f1;
+  border-bottom: 2px solid #bdc3c7;
 }
 
 .toolbar {
@@ -31,9 +38,8 @@ select {
   gap: 20px;
   align-items: flex-start;
   padding: 15px;
-  background: #ecf0f1;
-  border-bottom: 2px solid #bdc3c7;
   z-index: 100;
+  width: min(1280px, 100%);
 }
 
 .panel {
@@ -42,34 +48,30 @@ select {
   gap: 8px;
   padding: 10px;
   background: #ffffff;
-  border: 1px solid #cbd5e1;
+  border: 1px solid #cccccc;
   border-radius: 6px;
-  min-width: 220px;
 }
 
 .panel-core {
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-}
-
-.panel strong {
-  font-size: 15px;
 }
 
 .panel label {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+}
+
+.panel-core strong,
+.panel strong,
+.zoom-panel strong {
+  font-size: 16px;
 }
 
 .panel input[type="number"] {
-  width: 72px;
-}
-
-.panel input[type="text"],
-.panel select {
-  min-width: 0;
-  flex: 1;
+  width: 60px;
 }
 
 .checkbox-label {
@@ -87,8 +89,8 @@ select {
 }
 
 button {
-  padding: 8px 12px;
-  border: 1px solid #cbd5e1;
+  padding: 8px;
+  border: 1px solid #cccccc;
   border-radius: 4px;
   background: #ffffff;
   cursor: pointer;
@@ -113,26 +115,28 @@ button:disabled {
 
 .warn-button {
   background: #f39c12;
-  border-color: #f39c12;
+  border: none;
   color: #ffffff;
 }
 
 .danger-button {
   background: #c0392b;
-  border-color: #c0392b;
+  border: none;
   color: #ffffff;
 }
 
 .primary-button {
   background: #e74c3c;
-  border-color: #e74c3c;
+  border: none;
   color: #ffffff;
   font-weight: 700;
 }
 
 .zoom-panel {
   margin-left: auto;
-  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
 .canvas-area {
@@ -140,11 +144,15 @@ button:disabled {
   flex: 1;
   overflow: auto;
   background: #95a5a6;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
 }
 
 .empty-state {
   display: grid;
   place-items: center;
+  width: 100%;
   height: 100%;
   padding: 24px;
   color: #f8fafc;
@@ -156,6 +164,7 @@ button:disabled {
   position: relative;
   display: inline-block;
   transform-origin: top left;
+  margin: 24px auto;
 }
 
 .canvas-stage img {
@@ -254,5 +263,9 @@ button:disabled {
   .zoom-panel {
     width: 100%;
     margin-left: 0;
+  }
+
+  .zoom-panel {
+    align-items: flex-start;
   }
 }
