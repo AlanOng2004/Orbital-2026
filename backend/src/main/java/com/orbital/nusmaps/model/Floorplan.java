@@ -1,88 +1,92 @@
 package com.orbital.nusmaps.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+
+import jakarta.persistence.Index;
 import jakarta.persistence.Column;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "floorplans")
+@Table(
+        name = "floorplans",
+        indexes = {
+                @Index(name = "idx_floorplan_building_id", columnList = "building_id")
+        }
+)
 public class Floorplan {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer floorplanId;
+    private Long floorplanId;
 
-    @Column(name = "area_name")
-    private String areaName;
-
-    @Column(name = "building_name")
-    private String buildingName;
+    @JsonBackReference("fp-building")
+    @ManyToOne
+    @JoinColumn(name = "building_id")
+    private Building building;
 
     @Column(name = "level")
-    private String level;
+    private Integer level;
 
-    @Column(name = "image_url")
+    @Column(name = "image_url", columnDefinition = "TEXT", nullable = false)
     private String imageUrl;
 
-    @JsonManagedReference
+    @JsonManagedReference("node-fp")
     @OneToMany(mappedBy = "floorplan", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Node> nodes = new ArrayList<>();
 
     public Floorplan () {}
 
     public Floorplan(
-            Integer floorplanId,
-            String areaName,
-            String buildingName,
-            String level,
+            Long floorplanId,
+            Building building,
+            Integer level,
             String imageUrl
         ) {
         this.floorplanId = floorplanId;
-        this.areaName = areaName;
-        this.buildingName = buildingName;
+        this.building = building;
         this.level = level;
         this.imageUrl = imageUrl;
     }
 
     // ================= Getters and Setters =================
 
-    public Integer getFloorplanId() {
+    public Long getFloorplanId() {
         return floorplanId;
     }
 
-    public void setFloorplanId(Integer floorplanId) {
+    public void setFloorplanId(Long floorplanId) {
         this.floorplanId = floorplanId;
     }
 
-    public String getAreaName() {
-        return areaName;
+    public Building getBuilding() {
+        return building;
     }
 
-    public void setAreaName(String areaName) {
-        this.areaName = areaName;
+    public void setBuilding(Building building) {
+        this.building = building;
+
+        // Update nodes' faculty
+        for (Node n : nodes) {
+            n.setFloorplan(this);
+        }
     }
 
-    public String getBuildingName() {
-        return buildingName;
-    }
-
-    public void setBuildingName(String buildingName) {
-        this.buildingName = buildingName;
-    }
-
-    public String getLevel(){
+    public Integer getLevel(){
         return level;
     }
 
-    public void setLevel(String level){
+    public void setLevel(Integer level){
         this.level = level;
     }
 

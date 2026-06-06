@@ -25,7 +25,7 @@ public class AdminAccountInitializer {
             adminUser.setPassword(passwordEncoder.encode("password"));
             adminUser.setGender(User.Gender.Other);
             adminUser.setIsAdmin(true);
-            adminUser.setCreatedAt(LocalDateTime.now().toString());
+            adminUser.setCreatedAt(LocalDateTime.now());
 
             userRepository.save(adminUser);
         };
