@@ -4,5 +4,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.orbital.nusmaps.model.Node;
 
-public interface NodeRepository extends JpaRepository<Node, Integer> {
+public interface NodeRepository extends JpaRepository<Node, Long> {
 }

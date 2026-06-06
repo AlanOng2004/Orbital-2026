@@ -34,8 +34,8 @@ public class RegisterServiceImpl implements RegisterService {
         user.setPassword(passwordEncoder.encode(rawPassword));
         user.setIsAdmin(Boolean.TRUE.equals(user.getIsAdmin()));
 
-        if (user.getCreatedAt() == null || user.getCreatedAt().isBlank()) {
-            user.setCreatedAt(LocalDateTime.now().toString());
+        if (user.getCreatedAt() == null) {
+            user.setCreatedAt(LocalDateTime.now());
         }
 
         return userRepository.save(user);

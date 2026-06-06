@@ -1,14 +1,16 @@
 package com.orbital.nusmaps.dto;
 
+import java.time.LocalDateTime;
+
 public class UserResponse {
 
-    private final Integer userId;
+    private final Long userId;
     private final String username;
     private final String gender;
     private final Boolean isAdmin;
     private final String createdAt;
 
-    public UserResponse(Integer userId, String username, String gender, Boolean isAdmin, String createdAt) {
+    public UserResponse(Long userId, String username, String gender, Boolean isAdmin, LocalDateTime createdAt) {
         this.userId = userId;
         this.username = username;
         this.gender = gender;
@@ -16,7 +18,7 @@ public class UserResponse {
         this.createdAt = createdAt;
     }
 
-    public Integer getUserId() {
+    public Long getUserId() {
         return userId;
     }
 
@@ -32,7 +34,7 @@ public class UserResponse {
         return isAdmin;
     }
 
-    public String getCreatedAt() {
+    public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 }
