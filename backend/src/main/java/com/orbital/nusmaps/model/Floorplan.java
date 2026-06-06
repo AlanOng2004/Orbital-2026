@@ -76,12 +76,9 @@ public class Floorplan {
     public void setBuilding(Building building) {
         this.building = building;
 
-        Faculty newfac = building == null
-                ? null
-                : building.getFaculty();
-
+        // Update nodes' faculty
         for (Node n : nodes) {
-            n.setFaculty(newfac);
+            n.setFloorplan(this);
         }
     }
 

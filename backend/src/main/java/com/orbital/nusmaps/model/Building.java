@@ -91,6 +91,7 @@ public class Building {
     public void setFaculty(Faculty faculty) {
         this.faculty = faculty;
 
+        // Update nodes' faculty
         for (Floorplan fp : getFloorplans()) {
             fp.setBuilding(this);
         }
