@@ -1,5 +1,7 @@
 package com.orbital.nusmaps.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -11,6 +13,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 @Entity
@@ -58,6 +61,10 @@ public class Edge {
     private Boolean isRamp = false;
     @Column(name = "is_elevator", nullable = false)
     private Boolean isElevator = false;
+
+    @JsonIgnore
+    @OneToMany(mappedBy = "edge")
+    private List<InstantiatedEdge> edgeList = new ArrayList<>();
 
     public Edge () {}
     public Edge(
@@ -166,4 +173,6 @@ public class Edge {
             }
         }
     }
+
+    public List<InstantiatedEdge> getEdgeList() { return edgeList; }
 }
