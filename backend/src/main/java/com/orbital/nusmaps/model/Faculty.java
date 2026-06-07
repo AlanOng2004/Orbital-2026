@@ -44,6 +44,10 @@ public class Faculty {
     @OneToMany(mappedBy = "faculty", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Building> buildings = new ArrayList<>();
 
+    @JsonManagedReference("faculty-alias")
+    @OneToMany(mappedBy = "faculty", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<FacultyAlias> aliases = new ArrayList<>();
+
     public Faculty () {}
 
     public Faculty(
@@ -125,4 +129,32 @@ public class Faculty {
     }
 
     public List<Node> getNodes() { return this.nodes; }
+
+    public List<FacultyAlias> getAliases() { return aliases; }
+
+    public void setAliases(List<FacultyAlias> aliases) {
+        this.aliases.clear();
+        if (aliases == null) {
+            return;
+        }
+        for (FacultyAlias alias : aliases) {
+            addAlias(alias);
+        }
+    }
+
+    public void addAlias(FacultyAlias alias) {
+        if (alias == null) {
+            return;
+        }
+        aliases.add(alias);
+        alias.setFaculty(this);
+    }
+
+    public void removeAlias(FacultyAlias alias) {
+        if (alias == null) {
+            return;
+        }
+        aliases.remove(alias);
+        alias.setFaculty(null);
+    }
 }

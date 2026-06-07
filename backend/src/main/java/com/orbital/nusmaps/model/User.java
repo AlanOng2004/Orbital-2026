@@ -1,14 +1,21 @@
 package com.orbital.nusmaps.model;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.ArrayList;
+
 import jakarta.persistence.Column;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
@@ -41,6 +48,14 @@ public class User {
 
     @Column(name = "timetable_url", columnDefinition = "TEXT")
     private String timetableUrl;
+
+    @JsonManagedReference("sp-user")
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<SavedPlace> savedPlaces = new ArrayList<>();
+
+    @JsonManagedReference("sr-user")
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<SavedRoute> savedRoutes = new ArrayList<>();
 
     public User () {}
 
@@ -115,4 +130,60 @@ public class User {
     public String getTimetableUrl() { return this.timetableUrl; }
 
     public void setTimetableUrl(String timetableUrl) { this.timetableUrl = timetableUrl; }
+
+    public List<SavedPlace> getSavedPlaces() { return this.savedPlaces; }
+
+    public void setSavedPlaces(List<SavedPlace> savedPlaces) {
+        this.savedPlaces.clear();
+        if (savedPlaces == null) {
+            return;
+        }
+        for (SavedPlace savedPlace : savedPlaces) {
+            addSavedPlace(savedPlace);
+        }
+    }
+
+    public void addSavedPlace(SavedPlace savedPlace) {
+        if (savedPlace == null) {
+            return;
+        }
+        savedPlaces.add(savedPlace);
+        savedPlace.setUser(this);
+    }
+
+    public void removeSavedPlace(SavedPlace savedPlace) {
+        if (savedPlace == null) {
+            return;
+        }
+        savedPlaces.remove(savedPlace);
+        savedPlace.setUser(null);
+    }
+
+    public List<SavedRoute> getSavedRoutes() { return this.savedRoutes; }
+
+    public void setSavedRoutes(List<SavedRoute> savedRoutes) {
+        this.savedRoutes.clear();
+        if (savedRoutes == null) {
+            return;
+        }
+        for (SavedRoute savedRoute : savedRoutes) {
+            addSavedRoute(savedRoute);
+        }
+    }
+
+    public void addSavedRoute(SavedRoute savedRoute) {
+        if (savedRoute == null) {
+            return;
+        }
+        savedRoutes.add(savedRoute);
+        savedRoute.setUser(this);
+    }
+
+    public void removeSavedRoute(SavedRoute savedRoute) {
+        if (savedRoute == null) {
+            return;
+        }
+        savedRoutes.remove(savedRoute);
+        savedRoute.setUser(null);
+    }
 }

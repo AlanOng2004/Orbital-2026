@@ -50,6 +50,10 @@ public class Building {
     @OneToMany(mappedBy = "building", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Floorplan> floorplans = new ArrayList<>();
 
+    @JsonManagedReference("building-alias")
+    @OneToMany(mappedBy = "building", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<BuildingAlias> aliases = new ArrayList<>();
+
     public Building () {}
 
     public Building(
@@ -153,5 +157,33 @@ public class Building {
             }
             this.buildingPolygon = tmp.toString();
         }
+    }
+
+    public List<BuildingAlias> getAliases() { return aliases; }
+
+    public void setAliases(List<BuildingAlias> aliases) {
+        this.aliases.clear();
+        if (aliases == null) {
+            return;
+        }
+        for (BuildingAlias alias : aliases) {
+            addAlias(alias);
+        }
+    }
+
+    public void addAlias(BuildingAlias alias) {
+        if (alias == null) {
+            return;
+        }
+        aliases.add(alias);
+        alias.setBuilding(this);
+    }
+
+    public void removeAlias(BuildingAlias alias) {
+        if (alias == null) {
+            return;
+        }
+        aliases.remove(alias);
+        alias.setBuilding(null);
     }
 }

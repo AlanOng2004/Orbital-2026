@@ -1,5 +1,6 @@
 package com.orbital.nusmaps.model;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.ArrayList;
@@ -8,6 +9,7 @@ import java.util.Arrays;
 
 import jakarta.persistence.Index;
 import jakarta.persistence.Column;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -88,6 +90,22 @@ public class Node {
     @OneToMany(mappedBy = "target")
     private List<Edge> incomingEdges = new ArrayList<>();
 
+    @JsonManagedReference("node-alias")
+    @OneToMany(mappedBy = "node", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<NodeAlias> aliases = new ArrayList<>();
+
+    @JsonIgnore
+    @OneToMany(mappedBy = "node")
+    private List<SavedPlace> savedPlaces = new ArrayList<>();
+
+    @JsonIgnore
+    @OneToMany(mappedBy = "source")
+    private List<SavedRoute> routesStarting = new ArrayList<>();
+
+    @JsonIgnore
+    @OneToMany(mappedBy = "target")
+    private List<SavedRoute> routesEnding = new ArrayList<>();
+
     public Node () {}
 
     public Node(
@@ -167,9 +185,7 @@ public class Node {
         this.longitude = longitude;
     }
 
-    public Double getLatitude() {
-        return latitude;
-    }
+    public Double getLatitude() { return latitude; }
 
     public void setLatitude(Double latitude) {
         this.latitude = latitude;
@@ -204,4 +220,42 @@ public class Node {
     }
 
     public Faculty getFaculty() { return faculty; }
+
+    public List<NodeAlias> getAliases() { return aliases; }
+
+    public void setAliases(List<NodeAlias> aliases) {
+        this.aliases.clear();
+        if (aliases == null) {
+            return;
+        }
+        for (NodeAlias alias : aliases) {
+            addAlias(alias);
+        }
+    }
+
+    public void addAlias(NodeAlias alias) {
+        if (alias == null) {
+            return;
+        }
+        aliases.add(alias);
+        alias.setNode(this);
+    }
+
+    public void removeAlias(NodeAlias alias) {
+        if (alias == null) {
+            return;
+        }
+        aliases.remove(alias);
+        alias.setNode(null);
+    }
+
+    public List<SavedPlace> getSavedPlaces() {
+        return savedPlaces;
+    }
+    public List<SavedRoute> getRoutesStarting() {
+        return routesStarting;
+    }
+    public List<SavedRoute> getRoutesEnding() {
+        return routesEnding;
+    }
 }
