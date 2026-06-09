@@ -23,6 +23,23 @@ const EDGE_TAGS = [
   { value: 'Elevator', label: 'Elevator' },
 ];
 
+const toolbarPanelStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '5px',
+  background: '#fff',
+  padding: '6px 8px',
+  borderRadius: '6px',
+  border: '1px solid #ccc',
+  fontSize: '13px',
+};
+
+const compactButtonStyle = {
+  padding: '5px 8px',
+  borderRadius: '4px',
+  fontSize: '13px',
+};
+
 function escapeSql(value) {
   return String(value).replaceAll("'", "''");
 }
@@ -95,52 +112,7 @@ function getCoordinateNodes(nodes) {
     };
   }
 
-  return { coordinateNodes: sortCoordinateBoundary(coordinateNodes) };
-}
-
-function sortCoordinateBoundary(coordinateNodes) {
-  const center = coordinateNodes.reduce((acc, node) => ({
-    x: acc.x + node.x / coordinateNodes.length,
-    y: acc.y + node.y / coordinateNodes.length,
-  }), { x: 0, y: 0 });
-
-  return [...coordinateNodes].sort((a, b) =>
-    Math.atan2(a.y - center.y, a.x - center.x) -
-    Math.atan2(b.y - center.y, b.x - center.x)
-  );
-}
-
-function isPointOnSegment(point, a, b) {
-  const cross = (point.y - a.y) * (b.x - a.x) - (point.x - a.x) * (b.y - a.y);
-  if (Math.abs(cross) > 0.000001) return false;
-
-  const dot = (point.x - a.x) * (b.x - a.x) + (point.y - a.y) * (b.y - a.y);
-  if (dot < 0) return false;
-
-  const segmentLengthSquared = (b.x - a.x) ** 2 + (b.y - a.y) ** 2;
-  return dot <= segmentLengthSquared;
-}
-
-function isPointInCoordinateBounds(point, coordinateNodes) {
-  let inside = false;
-
-  for (let i = 0, j = coordinateNodes.length - 1; i < coordinateNodes.length; j = i++) {
-    const current = coordinateNodes[i];
-    const previous = coordinateNodes[j];
-
-    if (isPointOnSegment(point, previous, current)) {
-      return true;
-    }
-
-    const intersects = ((current.y > point.y) !== (previous.y > point.y)) &&
-      point.x < ((previous.x - current.x) * (point.y - current.y)) / (previous.y - current.y) + current.x;
-
-    if (intersects) {
-      inside = !inside;
-    }
-  }
-
-  return inside;
+  return { coordinateNodes };
 }
 
 function interpolateGeoPosition(node, coordinateNodes) {
@@ -188,16 +160,13 @@ function getNodesWithCalculatedCoordinates(nodes) {
     return { error };
   }
 
-  const outsideNode = realNodes.find((node) => {
-    const point = { x: getNodeX(node), y: getNodeY(node) };
-    return !Number.isFinite(point.x) ||
-      !Number.isFinite(point.y) ||
-      !isPointInCoordinateBounds(point, coordinateNodes);
-  });
+  const invalidNode = realNodes.find((node) =>
+    !Number.isFinite(getNodeX(node)) || !Number.isFinite(getNodeY(node))
+  );
 
-  if (outsideNode) {
+  if (invalidNode) {
     return {
-      error: `Node ${outsideNode.id ?? outsideNode.tempId} is outside the Coordinate node boundary.`,
+      error: `Node ${invalidNode.id ?? invalidNode.tempId} is missing valid x or y coordinates.`,
     };
   }
 
@@ -605,15 +574,18 @@ export default function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: 'sans-serif' }}>
-      <div style={{ padding: '15px', background: '#ecf0f1', display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'flex-start', borderBottom: '2px solid #bdc3c7', zIndex: 100 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }}>
+      <div style={{ padding: '8px 10px', background: '#ecf0f1', display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'flex-start', borderBottom: '2px solid #bdc3c7', zIndex: 100 }}>
+        <div style={toolbarPanelStyle}>
           <strong>0. Active Floorplan</strong>
           <label>ID: <input type="number" value={currentFloorplanId} onChange={handleFloorplanIdChange} style={{ width: '80px' }} /></label>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div style={{ ...toolbarPanelStyle, minWidth: '360px' }}>
           <strong>1. Core Tools</strong>
-          <input type="file" onChange={handleImageUpload} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>Image:</span>
+            <input type="file" onChange={handleImageUpload} style={{ maxWidth: '230px' }} />
+          </div>
           <input
             ref={jsonImportInputRef}
             type="file"
@@ -622,27 +594,22 @@ export default function App() {
             style={{ display: 'none' }}
           />
 
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button onClick={() => { setMode('ADD_NODE'); setSelectedNode(null); }} style={{ padding: '8px', cursor: 'pointer', background: mode === 'ADD_NODE' ? '#3498db' : '#fff', color: mode === 'ADD_NODE' ? 'white' : 'black', border: '1px solid #ccc', borderRadius: '4px' }}>Add Nodes</button>
-            <button onClick={() => setMode('ADD_EDGE')} style={{ padding: '8px', cursor: 'pointer', background: mode === 'ADD_EDGE' ? '#2ecc71' : '#fff', color: mode === 'ADD_EDGE' ? 'white' : 'black', border: '1px solid #ccc', borderRadius: '4px' }}>Connect Edges</button>
-          </div>
-
-          <button onClick={() => jsonImportInputRef.current?.click()} style={{ padding: '8px', cursor: 'pointer', background: '#34495e', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}>Import JSON</button>
-          <button onClick={exportJson} disabled={nodes.length === 0} style={{ padding: '8px', cursor: nodes.length === 0 ? 'not-allowed' : 'pointer', background: '#2c3e50', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', opacity: nodes.length === 0 ? 0.5 : 1 }}>Export JSON</button>
-
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button onClick={handleUndo} disabled={history.length === 0} style={{ flex: 1, padding: '8px', cursor: history.length === 0 ? 'not-allowed' : 'pointer', background: '#f39c12', color: 'white', border: 'none', borderRadius: '4px', opacity: history.length === 0 ? 0.5 : 1 }}>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <button onClick={() => { setMode('ADD_NODE'); setSelectedNode(null); }} style={{ ...compactButtonStyle, cursor: 'pointer', background: mode === 'ADD_NODE' ? '#3498db' : '#fff', color: mode === 'ADD_NODE' ? 'white' : 'black', border: '1px solid #ccc' }}>Add Nodes</button>
+            <button onClick={() => setMode('ADD_EDGE')} style={{ ...compactButtonStyle, cursor: 'pointer', background: mode === 'ADD_EDGE' ? '#2ecc71' : '#fff', color: mode === 'ADD_EDGE' ? 'white' : 'black', border: '1px solid #ccc' }}>Connect Edges</button>
+            <button onClick={() => jsonImportInputRef.current?.click()} style={{ ...compactButtonStyle, cursor: 'pointer', background: '#34495e', color: 'white', border: 'none', fontWeight: 'bold' }}>Import JSON</button>
+            <button onClick={exportJson} disabled={nodes.length === 0} style={{ ...compactButtonStyle, cursor: nodes.length === 0 ? 'not-allowed' : 'pointer', background: '#2c3e50', color: 'white', border: 'none', fontWeight: 'bold', opacity: nodes.length === 0 ? 0.5 : 1 }}>Export JSON</button>
+            <button onClick={handleUndo} disabled={history.length === 0} style={{ ...compactButtonStyle, cursor: history.length === 0 ? 'not-allowed' : 'pointer', background: '#f39c12', color: 'white', border: 'none', opacity: history.length === 0 ? 0.5 : 1 }}>
               Undo Last
             </button>
-            <button onClick={handleClearAll} disabled={nodes.length === 0} style={{ flex: 1, padding: '8px', cursor: nodes.length === 0 ? 'not-allowed' : 'pointer', background: '#c0392b', color: 'white', border: 'none', borderRadius: '4px', opacity: nodes.length === 0 ? 0.5 : 1 }}>
+            <button onClick={handleClearAll} disabled={nodes.length === 0} style={{ ...compactButtonStyle, cursor: nodes.length === 0 ? 'not-allowed' : 'pointer', background: '#c0392b', color: 'white', border: 'none', opacity: nodes.length === 0 ? 0.5 : 1 }}>
               Clear All
             </button>
+            <button onClick={generateSQL} style={{ ...compactButtonStyle, cursor: 'pointer', background: '#e74c3c', color: 'white', border: 'none', fontWeight: 'bold' }}>Generate SQL</button>
           </div>
-
-          <button onClick={generateSQL} style={{ padding: '8px', cursor: 'pointer', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}>Generate SQL</button>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }}>
+        <div style={toolbarPanelStyle}>
           <strong>2. Next Node Settings</strong>
           <label>ID: <input type="number" value={nextNodeId} onChange={(e) => setNextNodeId(parseInt(e.target.value, 10) || 1)} style={{ width: '60px' }} /></label>
           <label>Name: <input type="text" value={currentNodeName} onChange={(e) => setCurrentNodeName(e.target.value)} /></label>
@@ -661,7 +628,7 @@ export default function App() {
           )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }}>
+        <div style={toolbarPanelStyle}>
           <strong>3. Default Edge Settings</strong>
           <label>Tag:
             <select value={currentEdgeType} onChange={(e) => setCurrentEdgeType(e.target.value)} style={{ marginLeft: '5px' }}>
@@ -674,7 +641,7 @@ export default function App() {
         </div>
 
         {imageUrl && (
-          <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+          <div style={{ ...toolbarPanelStyle, marginLeft: 'auto', alignItems: 'flex-end' }}>
             <strong>Zoom: {Math.round(zoom * 100)}%</strong>
             <input type="range" min="0.2" max="3" step="0.1" value={zoom} onChange={(e) => setZoom(parseFloat(e.target.value))} />
           </div>
