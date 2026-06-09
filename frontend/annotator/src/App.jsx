@@ -47,12 +47,12 @@ function sqlBoolean(value) {
   return value ? 'TRUE' : 'FALSE';
 }
 
-function getCoordinateCorners(nodes) {
+function getCoordinateNodes(nodes) {
   const coordinateNodes = nodes.filter((node) => node.type === COORDINATE_NODE_TYPE);
 
-  if (coordinateNodes.length !== 4) {
+  if (coordinateNodes.length < 3) {
     return {
-      error: `Add exactly 4 Coordinate nodes before generating SQL. Found ${coordinateNodes.length}.`,
+      error: `Add at least 3 Coordinate nodes before generating SQL. Found ${coordinateNodes.length}.`,
     };
   }
 
@@ -66,50 +66,41 @@ function getCoordinateCorners(nodes) {
     };
   }
 
-  const sortedByY = [...coordinateNodes].sort((a, b) => a.y - b.y);
-  const top = sortedByY.slice(0, 2).sort((a, b) => a.x - b.x);
-  const bottom = sortedByY.slice(2).sort((a, b) => a.x - b.x);
-  const corners = {
-    topLeft: top[0],
-    topRight: top[1],
-    bottomLeft: bottom[0],
-    bottomRight: bottom[1],
-  };
+  return { coordinateNodes };
+}
 
-  const width = Math.max(corners.topRight.x, corners.bottomRight.x) -
-    Math.min(corners.topLeft.x, corners.bottomLeft.x);
-  const height = Math.max(corners.bottomLeft.y, corners.bottomRight.y) -
-    Math.min(corners.topLeft.y, corners.topRight.y);
+function interpolateGeoPosition(node, coordinateNodes) {
+  const exactCoordinate = coordinateNodes.find((coordinateNode) =>
+    coordinateNode.x === node.x && coordinateNode.y === node.y
+  );
 
-  if (width === 0 || height === 0) {
+  if (exactCoordinate) {
     return {
-      error: 'Coordinate nodes must define a non-zero floorplan width and height.',
+      longitude: exactCoordinate.longitude,
+      latitude: exactCoordinate.latitude,
     };
   }
 
-  return { corners };
-}
+  const weighted = coordinateNodes.reduce((acc, coordinateNode) => {
+    const dx = node.x - coordinateNode.x;
+    const dy = node.y - coordinateNode.y;
+    const distanceSquared = dx * dx + dy * dy;
+    const weight = 1 / Math.max(distanceSquared, 0.000001);
 
-function interpolateGeoPosition(node, corners) {
-  const leftX = (corners.topLeft.x + corners.bottomLeft.x) / 2;
-  const rightX = (corners.topRight.x + corners.bottomRight.x) / 2;
-  const topY = (corners.topLeft.y + corners.topRight.y) / 2;
-  const bottomY = (corners.bottomLeft.y + corners.bottomRight.y) / 2;
-  const u = (node.x - leftX) / (rightX - leftX);
-  const v = (node.y - topY) / (bottomY - topY);
-
-  const longitudeTop = corners.topLeft.longitude +
-    u * (corners.topRight.longitude - corners.topLeft.longitude);
-  const longitudeBottom = corners.bottomLeft.longitude +
-    u * (corners.bottomRight.longitude - corners.bottomLeft.longitude);
-  const latitudeTop = corners.topLeft.latitude +
-    u * (corners.topRight.latitude - corners.topLeft.latitude);
-  const latitudeBottom = corners.bottomLeft.latitude +
-    u * (corners.bottomRight.latitude - corners.bottomLeft.latitude);
+    return {
+      weightSum: acc.weightSum + weight,
+      longitudeSum: acc.longitudeSum + coordinateNode.longitude * weight,
+      latitudeSum: acc.latitudeSum + coordinateNode.latitude * weight,
+    };
+  }, {
+    weightSum: 0,
+    longitudeSum: 0,
+    latitudeSum: 0,
+  });
 
   return {
-    longitude: longitudeTop + v * (longitudeBottom - longitudeTop),
-    latitude: latitudeTop + v * (latitudeBottom - latitudeTop),
+    longitude: weighted.longitudeSum / weighted.weightSum,
+    latitude: weighted.latitudeSum / weighted.weightSum,
   };
 }
 
@@ -272,14 +263,14 @@ export default function App() {
       return;
     }
 
-    const { corners, error } = getCoordinateCorners(nodes);
+    const { coordinateNodes, error } = getCoordinateNodes(nodes);
     if (error) {
       alert(error);
       return;
     }
 
     const nodeValues = realNodes.map(n => {
-      const { longitude, latitude } = interpolateGeoPosition(n, corners);
+      const { longitude, latitude } = interpolateGeoPosition(n, coordinateNodes);
       return `(${n.id}, '${escapeSql(n.name)}', '${escapeSql(n.type)}', ${n.floorplan_id}, ${n.x}, ${n.y}, ${longitude.toFixed(8)}, ${latitude.toFixed(8)})`;
     }).join(',\n');
 
