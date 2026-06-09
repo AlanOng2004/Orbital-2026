@@ -2,6 +2,9 @@ package com.orbital.nusmaps.dto;
 
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class AnnotatorImportRequest {
 
     private List<AnnotatorNodeImport> nodes;
@@ -24,13 +27,23 @@ public class AnnotatorImportRequest {
     }
 
     public static class AnnotatorNodeImport {
+        @JsonAlias({"temp_id", "id"})
         private Long tempId;
+        @JsonAlias({"node_name", "name"})
         private String nodeName;
+        @JsonAlias("dual_name")
         private String dualName;
+        @JsonAlias({"node_type", "type"})
         private String nodeType;
+        @JsonAlias("floorplan_id")
         private Long floorplanId;
+        @JsonAlias("room_polygon")
         private String roomPolygon;
+        @JsonProperty("xCoordinate")
+        @JsonAlias({"x_coordinate", "x"})
         private Double xCoordinate;
+        @JsonProperty("yCoordinate")
+        @JsonAlias({"y_coordinate", "y"})
         private Double yCoordinate;
         private Double longitude;
         private Double latitude;
@@ -117,14 +130,22 @@ public class AnnotatorImportRequest {
     }
 
     public static class AnnotatorEdgeImport {
+        @JsonAlias({"source_temp_id", "source"})
         private Long sourceTempId;
+        @JsonAlias({"target_temp_id", "target"})
         private Long targetTempId;
         private Double weight;
+        @JsonAlias("is_bus")
         private Boolean isBus;
+        @JsonAlias("is_sheltered")
         private Boolean isSheltered;
+        @JsonAlias("is_keycard")
         private Boolean isKeycard;
+        @JsonAlias("is_stair")
         private Boolean isStair;
+        @JsonAlias("is_ramp")
         private Boolean isRamp;
+        @JsonAlias("is_elevator")
         private Boolean isElevator;
 
         public Long getSourceTempId() {

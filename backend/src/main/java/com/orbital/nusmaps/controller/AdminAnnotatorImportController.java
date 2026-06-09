@@ -118,6 +118,9 @@ public class AdminAnnotatorImportController {
         if (nodeRequest.getFloorplanId() == null) {
             throw new IllegalArgumentException("Floorplan ID is required for tempId: " + nodeRequest.getTempId());
         }
+        if (nodeRequest.getXCoordinate() == null || nodeRequest.getYCoordinate() == null) {
+            throw new IllegalArgumentException("X and Y coordinates are required for tempId: " + nodeRequest.getTempId());
+        }
         if (nodeRequest.getLongitude() == null || nodeRequest.getLatitude() == null) {
             throw new IllegalArgumentException("Longitude and latitude are required for tempId: " + nodeRequest.getTempId());
         }
@@ -131,6 +134,9 @@ public class AdminAnnotatorImportController {
     ) {
         if (edgeRequest == null) {
             throw new IllegalArgumentException("Edge entry cannot be null.");
+        }
+        if (edgeRequest.getSourceTempId() == null || edgeRequest.getTargetTempId() == null) {
+            throw new IllegalArgumentException("Edge sourceTempId and targetTempId are required.");
         }
 
         Node source = savedNodesByTempId.get(edgeRequest.getSourceTempId());
