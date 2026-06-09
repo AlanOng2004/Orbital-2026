@@ -47,8 +47,33 @@ function sqlBoolean(value) {
   return value ? 'TRUE' : 'FALSE';
 }
 
+function toNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getNodeX(node) {
+  return toNumber(node.xCoordinate ?? node.x_coordinate ?? node.x);
+}
+
+function getNodeY(node) {
+  return toNumber(node.yCoordinate ?? node.y_coordinate ?? node.y);
+}
+
+function getNodeType(node) {
+  return node.nodeType ?? node.type;
+}
+
 function getCoordinateNodes(nodes) {
-  const coordinateNodes = nodes.filter((node) => node.type === COORDINATE_NODE_TYPE);
+  const coordinateNodes = nodes
+    .filter((node) => getNodeType(node) === COORDINATE_NODE_TYPE)
+    .map((node) => ({
+      ...node,
+      x: getNodeX(node),
+      y: getNodeY(node),
+      longitude: toNumber(node.longitude),
+      latitude: toNumber(node.latitude),
+    }));
 
   if (coordinateNodes.length < 3) {
     return {
@@ -57,21 +82,72 @@ function getCoordinateNodes(nodes) {
   }
 
   const invalidCoordinate = coordinateNodes.find(
-    (node) => !Number.isFinite(node.longitude) || !Number.isFinite(node.latitude),
+    (node) =>
+      !Number.isFinite(node.x) ||
+      !Number.isFinite(node.y) ||
+      !Number.isFinite(node.longitude) ||
+      !Number.isFinite(node.latitude),
   );
 
   if (invalidCoordinate) {
     return {
-      error: `Coordinate node ${invalidCoordinate.id} is missing a valid longitude or latitude.`,
+      error: `Coordinate node ${invalidCoordinate.id} is missing valid x, y, longitude, or latitude.`,
     };
   }
 
-  return { coordinateNodes };
+  return { coordinateNodes: sortCoordinateBoundary(coordinateNodes) };
+}
+
+function sortCoordinateBoundary(coordinateNodes) {
+  const center = coordinateNodes.reduce((acc, node) => ({
+    x: acc.x + node.x / coordinateNodes.length,
+    y: acc.y + node.y / coordinateNodes.length,
+  }), { x: 0, y: 0 });
+
+  return [...coordinateNodes].sort((a, b) =>
+    Math.atan2(a.y - center.y, a.x - center.x) -
+    Math.atan2(b.y - center.y, b.x - center.x)
+  );
+}
+
+function isPointOnSegment(point, a, b) {
+  const cross = (point.y - a.y) * (b.x - a.x) - (point.x - a.x) * (b.y - a.y);
+  if (Math.abs(cross) > 0.000001) return false;
+
+  const dot = (point.x - a.x) * (b.x - a.x) + (point.y - a.y) * (b.y - a.y);
+  if (dot < 0) return false;
+
+  const segmentLengthSquared = (b.x - a.x) ** 2 + (b.y - a.y) ** 2;
+  return dot <= segmentLengthSquared;
+}
+
+function isPointInCoordinateBounds(point, coordinateNodes) {
+  let inside = false;
+
+  for (let i = 0, j = coordinateNodes.length - 1; i < coordinateNodes.length; j = i++) {
+    const current = coordinateNodes[i];
+    const previous = coordinateNodes[j];
+
+    if (isPointOnSegment(point, previous, current)) {
+      return true;
+    }
+
+    const intersects = ((current.y > point.y) !== (previous.y > point.y)) &&
+      point.x < ((previous.x - current.x) * (point.y - current.y)) / (previous.y - current.y) + current.x;
+
+    if (intersects) {
+      inside = !inside;
+    }
+  }
+
+  return inside;
 }
 
 function interpolateGeoPosition(node, coordinateNodes) {
+  const nodeX = getNodeX(node);
+  const nodeY = getNodeY(node);
   const exactCoordinate = coordinateNodes.find((coordinateNode) =>
-    coordinateNode.x === node.x && coordinateNode.y === node.y
+    coordinateNode.x === nodeX && coordinateNode.y === nodeY
   );
 
   if (exactCoordinate) {
@@ -82,8 +158,8 @@ function interpolateGeoPosition(node, coordinateNodes) {
   }
 
   const weighted = coordinateNodes.reduce((acc, coordinateNode) => {
-    const dx = node.x - coordinateNode.x;
-    const dy = node.y - coordinateNode.y;
+    const dx = nodeX - coordinateNode.x;
+    const dy = nodeY - coordinateNode.y;
     const distanceSquared = dx * dx + dy * dy;
     const weight = 1 / Math.max(distanceSquared, 0.000001);
 
@@ -104,6 +180,148 @@ function interpolateGeoPosition(node, coordinateNodes) {
   };
 }
 
+function getNodesWithCalculatedCoordinates(nodes) {
+  const realNodes = nodes.filter((node) => getNodeType(node) !== COORDINATE_NODE_TYPE);
+  const { coordinateNodes, error } = getCoordinateNodes(nodes);
+
+  if (error) {
+    return { error };
+  }
+
+  const outsideNode = realNodes.find((node) => {
+    const point = { x: getNodeX(node), y: getNodeY(node) };
+    return !Number.isFinite(point.x) ||
+      !Number.isFinite(point.y) ||
+      !isPointInCoordinateBounds(point, coordinateNodes);
+  });
+
+  if (outsideNode) {
+    return {
+      error: `Node ${outsideNode.id ?? outsideNode.tempId} is outside the Coordinate node boundary.`,
+    };
+  }
+
+  return {
+    nodesWithCoordinates: realNodes.map((node) => {
+      const { longitude, latitude } = interpolateGeoPosition(node, coordinateNodes);
+      return {
+        ...node,
+        longitude,
+        latitude,
+      };
+    }),
+    coordinateNodes,
+  };
+}
+
+function getNodeImportFields(node, coordinateNodes = []) {
+  const nodeType = node.nodeType ?? node.type;
+  const xCoordinate = getNodeX(node);
+  const yCoordinate = getNodeY(node);
+  let longitude = toNumber(node.longitude);
+  let latitude = toNumber(node.latitude);
+
+  if ((longitude === null || latitude === null) && coordinateNodes.length > 0) {
+    const interpolated = interpolateGeoPosition(
+      { ...node, x: xCoordinate, y: yCoordinate },
+      coordinateNodes,
+    );
+    longitude = interpolated.longitude;
+    latitude = interpolated.latitude;
+  }
+
+  return {
+    tempId: toNumber(node.tempId ?? node.id),
+    nodeName: node.nodeName ?? node.name,
+    dualName: node.dualName ?? node.dual_name ?? null,
+    nodeType,
+    floorplanId: toNumber(node.floorplanId ?? node.floorplan_id),
+    roomPolygon: node.roomPolygon ?? node.room_polygon ?? null,
+    xCoordinate,
+    yCoordinate,
+    longitude,
+    latitude,
+  };
+}
+
+function getEdgeImportFields(edge, sourceTempId, targetTempId) {
+  const flags = edgeFlags(edge.edge_type ?? edge.edgeType ?? 'walkway');
+
+  return {
+    sourceTempId,
+    targetTempId,
+    weight: toNumber(edge.weight),
+    isBus: Boolean(edge.isBus ?? edge.is_bus ?? flags.is_bus),
+    isSheltered: Boolean(edge.isSheltered ?? edge.is_sheltered ?? flags.is_sheltered),
+    isKeycard: Boolean(edge.isKeycard ?? edge.is_keycard ?? flags.is_keycard),
+    isStair: Boolean(edge.isStair ?? edge.is_stair ?? flags.is_stair),
+    isRamp: Boolean(edge.isRamp ?? edge.is_ramp ?? flags.is_ramp),
+    isElevator: Boolean(edge.isElevator ?? edge.is_elevator ?? flags.is_elevator),
+  };
+}
+
+function buildImportPayload(graph) {
+  if (!graph || !Array.isArray(graph.nodes)) {
+    throw new Error('JSON import requires a top-level nodes array.');
+  }
+
+  const inputNodes = graph.nodes;
+  const realNodes = inputNodes.filter((node) => getNodeType(node) !== COORDINATE_NODE_TYPE);
+  const needsInterpolation = realNodes.some((node) =>
+    toNumber(node.longitude) === null || toNumber(node.latitude) === null
+  );
+  let nodesForImport = realNodes;
+  let coordinateNodes = [];
+
+  if (needsInterpolation) {
+    const { nodesWithCoordinates, coordinateNodes: validatedCoordinateNodes, error } =
+      getNodesWithCalculatedCoordinates(inputNodes);
+    if (error) {
+      throw new Error(error);
+    }
+    nodesForImport = nodesWithCoordinates;
+    coordinateNodes = validatedCoordinateNodes;
+  }
+
+  const nodes = nodesForImport.map((node) => getNodeImportFields(node, coordinateNodes));
+  const rawEdges = Array.isArray(graph.edges) ? graph.edges : [];
+  const edges = rawEdges.flatMap((edge) => {
+    if (edge.sourceTempId != null || edge.targetTempId != null) {
+      return [getEdgeImportFields(edge, toNumber(edge.sourceTempId), toNumber(edge.targetTempId))];
+    }
+
+    const sourceTempId = toNumber(edge.source);
+    const targetTempId = toNumber(edge.target);
+    const expandedEdges = [];
+
+    if (edge.is_accessible_fwd !== false) {
+      expandedEdges.push(getEdgeImportFields(edge, sourceTempId, targetTempId));
+    }
+    if (edge.is_accessible_bwd === true) {
+      expandedEdges.push(getEdgeImportFields(edge, targetTempId, sourceTempId));
+    }
+
+    return expandedEdges;
+  });
+
+  return { nodes, edges };
+}
+
+function downloadJson(filename, payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: 'application/json',
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 export default function App() {
   const [imageUrl, setImageUrl] = useState(null);
   const [nodes, setNodes] = useState([]);
@@ -119,6 +337,7 @@ export default function App() {
   const [hoveredEdgeId, setHoveredEdgeId] = useState(null);
 
   const imgRef = useRef(null);
+  const jsonImportInputRef = useRef(null);
 
   const [currentNodeName, setCurrentNodeName] = useState('Corridor');
   const [currentNodeType, setCurrentNodeType] = useState('Corridor');
@@ -133,6 +352,44 @@ export default function App() {
     const file = event.target.files[0];
     if (file) {
       setImageUrl(URL.createObjectURL(file));
+    }
+  };
+
+  const handleJsonImport = async (event) => {
+    const file = event.target.files[0];
+    event.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      const importedGraph = JSON.parse(await file.text());
+      const payload = buildImportPayload(importedGraph);
+      const token = localStorage.getItem('jwt_token');
+
+      if (!token) {
+        throw new Error('You must be logged in as an admin before importing JSON.');
+      }
+
+      const response = await fetch('/api/admin/annotator/import', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const responseBody = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(responseBody.error || 'JSON import failed.');
+      }
+
+      alert(`Imported ${responseBody.importedNodes} nodes and ${responseBody.importedEdges} edges.`);
+    } catch (error) {
+      console.error('JSON import failed:', error);
+      alert(error.message || 'JSON import failed.');
     }
   };
 
@@ -257,24 +514,22 @@ export default function App() {
   };
 
   const generateSQL = () => {
-    const realNodes = nodes.filter(n => n.type !== COORDINATE_NODE_TYPE);
-    if (realNodes.length === 0) {
-      alert('No non-coordinate nodes added yet.');
-      return;
-    }
-
-    const { coordinateNodes, error } = getCoordinateNodes(nodes);
+    const { nodesWithCoordinates, error } = getNodesWithCalculatedCoordinates(nodes);
     if (error) {
       alert(error);
       return;
     }
 
-    const nodeValues = realNodes.map(n => {
-      const { longitude, latitude } = interpolateGeoPosition(n, coordinateNodes);
-      return `(${n.id}, '${escapeSql(n.name)}', '${escapeSql(n.type)}', ${n.floorplan_id}, ${n.x}, ${n.y}, ${longitude.toFixed(8)}, ${latitude.toFixed(8)})`;
-    }).join(',\n');
+    if (nodesWithCoordinates.length === 0) {
+      alert('No non-coordinate nodes added yet.');
+      return;
+    }
 
-    const realNodeIds = new Set(realNodes.map(n => n.id));
+    const nodeValues = nodesWithCoordinates.map(n =>
+      `(${n.id}, '${escapeSql(n.name)}', '${escapeSql(n.type)}', ${n.floorplan_id}, ${n.x}, ${n.y}, ${n.longitude.toFixed(8)}, ${n.latitude.toFixed(8)})`
+    ).join(',\n');
+
+    const realNodeIds = new Set(nodesWithCoordinates.map(n => n.id));
     const edgeValuesArray = [];
     edges.forEach(e => {
       if (!realNodeIds.has(e.source) || !realNodeIds.has(e.target)) {
@@ -307,6 +562,24 @@ export default function App() {
     alert('SQL generated in browser console!');
   };
 
+  const exportJson = () => {
+    const { nodesWithCoordinates, error } = getNodesWithCalculatedCoordinates(nodes);
+    if (error) {
+      alert(error);
+      return;
+    }
+
+    downloadJson(`annotator-floorplan-${currentFloorplanId}.json`, {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      nodes: [
+        ...nodes.filter(node => getNodeType(node) === COORDINATE_NODE_TYPE),
+        ...nodesWithCoordinates,
+      ],
+      edges,
+    });
+  };
+
   const getEdgeColor = (edge) => {
     if (edge.is_accessible_fwd && edge.is_accessible_bwd) return 'rgba(46, 204, 113, 0.8)';
     if (!edge.is_accessible_fwd && !edge.is_accessible_bwd) return 'rgba(231, 76, 60, 0.8)';
@@ -330,11 +603,21 @@ export default function App() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <strong>1. Core Tools</strong>
           <input type="file" onChange={handleImageUpload} />
+          <input
+            ref={jsonImportInputRef}
+            type="file"
+            accept="application/json,.json"
+            onChange={handleJsonImport}
+            style={{ display: 'none' }}
+          />
 
           <div style={{ display: 'flex', gap: '10px' }}>
             <button onClick={() => { setMode('ADD_NODE'); setSelectedNode(null); }} style={{ padding: '8px', cursor: 'pointer', background: mode === 'ADD_NODE' ? '#3498db' : '#fff', color: mode === 'ADD_NODE' ? 'white' : 'black', border: '1px solid #ccc', borderRadius: '4px' }}>Add Nodes</button>
             <button onClick={() => setMode('ADD_EDGE')} style={{ padding: '8px', cursor: 'pointer', background: mode === 'ADD_EDGE' ? '#2ecc71' : '#fff', color: mode === 'ADD_EDGE' ? 'white' : 'black', border: '1px solid #ccc', borderRadius: '4px' }}>Connect Edges</button>
           </div>
+
+          <button onClick={() => jsonImportInputRef.current?.click()} style={{ padding: '8px', cursor: 'pointer', background: '#34495e', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}>Import JSON</button>
+          <button onClick={exportJson} disabled={nodes.length === 0} style={{ padding: '8px', cursor: nodes.length === 0 ? 'not-allowed' : 'pointer', background: '#2c3e50', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', opacity: nodes.length === 0 ? 0.5 : 1 }}>Export JSON</button>
 
           <div style={{ display: 'flex', gap: '10px' }}>
             <button onClick={handleUndo} disabled={history.length === 0} style={{ flex: 1, padding: '8px', cursor: history.length === 0 ? 'not-allowed' : 'pointer', background: '#f39c12', color: 'white', border: 'none', borderRadius: '4px', opacity: history.length === 0 ? 0.5 : 1 }}>

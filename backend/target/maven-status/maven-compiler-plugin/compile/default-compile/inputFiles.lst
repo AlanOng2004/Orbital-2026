@@ -5,7 +5,10 @@
 /Users/alanong/Documents/GitHub/Orbital-2026/backend/src/main/java/com/orbital/nusmaps/config/PasswordConfig.java
 /Users/alanong/Documents/GitHub/Orbital-2026/backend/src/main/java/com/orbital/nusmaps/config/SecurityConfig.java
 /Users/alanong/Documents/GitHub/Orbital-2026/backend/src/main/java/com/orbital/nusmaps/config/WebConfig.java
+/Users/alanong/Documents/GitHub/Orbital-2026/backend/src/main/java/com/orbital/nusmaps/controller/AdminAnnotatorImportController.java
 /Users/alanong/Documents/GitHub/Orbital-2026/backend/src/main/java/com/orbital/nusmaps/controller/AuthController.java
+/Users/alanong/Documents/GitHub/Orbital-2026/backend/src/main/java/com/orbital/nusmaps/dto/AnnotatorImportRequest.java
+/Users/alanong/Documents/GitHub/Orbital-2026/backend/src/main/java/com/orbital/nusmaps/dto/AnnotatorImportResponse.java
 /Users/alanong/Documents/GitHub/Orbital-2026/backend/src/main/java/com/orbital/nusmaps/dto/AuthResponse.java
 /Users/alanong/Documents/GitHub/Orbital-2026/backend/src/main/java/com/orbital/nusmaps/dto/ErrorResponse.java
 /Users/alanong/Documents/GitHub/Orbital-2026/backend/src/main/java/com/orbital/nusmaps/dto/LoginRequest.java

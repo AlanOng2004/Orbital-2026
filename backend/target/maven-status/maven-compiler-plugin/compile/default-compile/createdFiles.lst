@@ -5,11 +5,16 @@ com/orbital/nusmaps/repository/NodeRepository.class
 com/orbital/nusmaps/Backend.class
 com/orbital/nusmaps/service/RegisterService.class
 com/orbital/nusmaps/model/Floorplan.class
+com/orbital/nusmaps/dto/AnnotatorImportRequest$AnnotatorNodeImport.class
 com/orbital/nusmaps/model/User$Gender.class
 com/orbital/nusmaps/model/User.class
 com/orbital/nusmaps/repository/EdgeRepository.class
+com/orbital/nusmaps/dto/AnnotatorImportRequest.class
 com/orbital/nusmaps/model/Edge.class
+com/orbital/nusmaps/dto/AnnotatorImportRequest$AnnotatorEdgeImport.class
 com/orbital/nusmaps/repository/FloorplanRepository.class
 com/orbital/nusmaps/service/LoginService.class
+com/orbital/nusmaps/dto/AnnotatorImportResponse.class
 com/orbital/nusmaps/config/WebConfig.class
 com/orbital/nusmaps/model/Node.class
+com/orbital/nusmaps/controller/AdminAnnotatorImportController.class
