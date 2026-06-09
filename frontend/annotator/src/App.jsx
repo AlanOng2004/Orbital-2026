@@ -214,7 +214,7 @@ function getNodesWithCalculatedCoordinates(nodes) {
   };
 }
 
-function getNodeImportFields(node, coordinateNodes = []) {
+function getNodeImportFields(node, coordinateNodes = [], defaultFloorplanId = null) {
   const nodeType = node.nodeType ?? node.type;
   const xCoordinate = getNodeX(node);
   const yCoordinate = getNodeY(node);
@@ -235,7 +235,7 @@ function getNodeImportFields(node, coordinateNodes = []) {
     nodeName: node.nodeName ?? node.name,
     dualName: node.dualName ?? node.dual_name ?? null,
     nodeType,
-    floorplanId: toNumber(node.floorplanId ?? node.floorplan_id),
+    floorplanId: toNumber(node.floorplanId ?? node.floorplan_id) ?? defaultFloorplanId,
     roomPolygon: node.roomPolygon ?? node.room_polygon ?? null,
     xCoordinate,
     yCoordinate,
@@ -260,7 +260,7 @@ function getEdgeImportFields(edge, sourceTempId, targetTempId) {
   };
 }
 
-function buildImportPayload(graph) {
+function buildImportPayload(graph, defaultFloorplanId = null) {
   if (!graph || !Array.isArray(graph.nodes)) {
     throw new Error('JSON import requires a top-level nodes array.');
   }
@@ -283,7 +283,9 @@ function buildImportPayload(graph) {
     coordinateNodes = validatedCoordinateNodes;
   }
 
-  const nodes = nodesForImport.map((node) => getNodeImportFields(node, coordinateNodes));
+  const nodes = nodesForImport.map((node) =>
+    getNodeImportFields(node, coordinateNodes, defaultFloorplanId)
+  );
   const rawEdges = Array.isArray(graph.edges) ? graph.edges : [];
   const edges = rawEdges.flatMap((edge) => {
     if (edge.sourceTempId != null || edge.targetTempId != null) {
@@ -365,7 +367,7 @@ export default function App() {
 
     try {
       const importedGraph = JSON.parse(await file.text());
-      const payload = buildImportPayload(importedGraph);
+      const payload = buildImportPayload(importedGraph, currentFloorplanId);
       const token = localStorage.getItem('jwt_token');
 
       if (!token) {
@@ -402,6 +404,10 @@ export default function App() {
     } else if (currentNodeName === COORDINATE_NODE_TYPE && nextType !== COORDINATE_NODE_TYPE) {
       setCurrentNodeName(nextType);
     }
+  };
+
+  const handleFloorplanIdChange = (event) => {
+    setCurrentFloorplanId(parseInt(event.target.value, 10) || 1);
   };
 
   const handleCanvasClick = (e) => {
@@ -600,6 +606,11 @@ export default function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: 'sans-serif' }}>
       <div style={{ padding: '15px', background: '#ecf0f1', display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'flex-start', borderBottom: '2px solid #bdc3c7', zIndex: 100 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }}>
+          <strong>0. Active Floorplan</strong>
+          <label>ID: <input type="number" value={currentFloorplanId} onChange={handleFloorplanIdChange} style={{ width: '80px' }} /></label>
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <strong>1. Core Tools</strong>
           <input type="file" onChange={handleImageUpload} />
@@ -634,7 +645,6 @@ export default function App() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }}>
           <strong>2. Next Node Settings</strong>
           <label>ID: <input type="number" value={nextNodeId} onChange={(e) => setNextNodeId(parseInt(e.target.value, 10) || 1)} style={{ width: '60px' }} /></label>
-          <label>Floorplan: <input type="number" value={currentFloorplanId} onChange={(e) => setCurrentFloorplanId(parseInt(e.target.value, 10) || 1)} style={{ width: '60px' }} /></label>
           <label>Name: <input type="text" value={currentNodeName} onChange={(e) => setCurrentNodeName(e.target.value)} /></label>
           <label>Type:
             <select value={currentNodeType} onChange={handleNodeTypeChange} style={{ marginLeft: '5px' }}>
