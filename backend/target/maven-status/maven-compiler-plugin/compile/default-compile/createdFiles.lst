@@ -1,4 +1,3 @@
-com/orbital/nusmaps/model/Edge$EdgeType.class
 com/orbital/nusmaps/config/DotEnvEnvironmentPostProcessor.class
 com/orbital/nusmaps/model/Node$NodeType.class
 com/orbital/nusmaps/repository/UserRepository.class

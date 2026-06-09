@@ -8,7 +8,7 @@ public class UserResponse {
     private final String username;
     private final String gender;
     private final Boolean isAdmin;
-    private final String createdAt;
+    private final LocalDateTime createdAt;
 
     public UserResponse(Long userId, String username, String gender, Boolean isAdmin, LocalDateTime createdAt) {
         this.userId = userId;

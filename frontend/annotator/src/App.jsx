@@ -1,4 +1,117 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
+
+const COORDINATE_NODE_TYPE = 'Coordinate';
+
+const NODE_TYPES = [
+  'Food',
+  'Room',
+  'Bus_stop',
+  'Toilet',
+  'Junction',
+  'Stair',
+  'Corridor',
+  COORDINATE_NODE_TYPE,
+];
+
+const EDGE_TAGS = [
+  { value: 'walkway', label: 'Walkway' },
+  { value: 'Bus', label: 'Bus' },
+  { value: 'Sheltered', label: 'Sheltered' },
+  { value: 'Keycard', label: 'Keycard' },
+  { value: 'Stair', label: 'Stair' },
+  { value: 'Ramp', label: 'Ramp' },
+  { value: 'Elevator', label: 'Elevator' },
+];
+
+function escapeSql(value) {
+  return String(value).replaceAll("'", "''");
+}
+
+function parseCoordinateInput(value) {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function edgeFlags(edgeType) {
+  return {
+    is_bus: edgeType === 'Bus',
+    is_sheltered: edgeType === 'Bus' || edgeType === 'Sheltered',
+    is_keycard: edgeType === 'Keycard',
+    is_stair: edgeType === 'Stair',
+    is_ramp: edgeType === 'Ramp',
+    is_elevator: edgeType === 'Elevator',
+  };
+}
+
+function sqlBoolean(value) {
+  return value ? 'TRUE' : 'FALSE';
+}
+
+function getCoordinateCorners(nodes) {
+  const coordinateNodes = nodes.filter((node) => node.type === COORDINATE_NODE_TYPE);
+
+  if (coordinateNodes.length !== 4) {
+    return {
+      error: `Add exactly 4 Coordinate nodes before generating SQL. Found ${coordinateNodes.length}.`,
+    };
+  }
+
+  const invalidCoordinate = coordinateNodes.find(
+    (node) => !Number.isFinite(node.longitude) || !Number.isFinite(node.latitude),
+  );
+
+  if (invalidCoordinate) {
+    return {
+      error: `Coordinate node ${invalidCoordinate.id} is missing a valid longitude or latitude.`,
+    };
+  }
+
+  const sortedByY = [...coordinateNodes].sort((a, b) => a.y - b.y);
+  const top = sortedByY.slice(0, 2).sort((a, b) => a.x - b.x);
+  const bottom = sortedByY.slice(2).sort((a, b) => a.x - b.x);
+  const corners = {
+    topLeft: top[0],
+    topRight: top[1],
+    bottomLeft: bottom[0],
+    bottomRight: bottom[1],
+  };
+
+  const width = Math.max(corners.topRight.x, corners.bottomRight.x) -
+    Math.min(corners.topLeft.x, corners.bottomLeft.x);
+  const height = Math.max(corners.bottomLeft.y, corners.bottomRight.y) -
+    Math.min(corners.topLeft.y, corners.topRight.y);
+
+  if (width === 0 || height === 0) {
+    return {
+      error: 'Coordinate nodes must define a non-zero floorplan width and height.',
+    };
+  }
+
+  return { corners };
+}
+
+function interpolateGeoPosition(node, corners) {
+  const leftX = (corners.topLeft.x + corners.bottomLeft.x) / 2;
+  const rightX = (corners.topRight.x + corners.bottomRight.x) / 2;
+  const topY = (corners.topLeft.y + corners.topRight.y) / 2;
+  const bottomY = (corners.bottomLeft.y + corners.bottomRight.y) / 2;
+  const u = (node.x - leftX) / (rightX - leftX);
+  const v = (node.y - topY) / (bottomY - topY);
+
+  const longitudeTop = corners.topLeft.longitude +
+    u * (corners.topRight.longitude - corners.topLeft.longitude);
+  const longitudeBottom = corners.bottomLeft.longitude +
+    u * (corners.bottomRight.longitude - corners.bottomLeft.longitude);
+  const latitudeTop = corners.topLeft.latitude +
+    u * (corners.topRight.latitude - corners.topLeft.latitude);
+  const latitudeBottom = corners.bottomLeft.latitude +
+    u * (corners.bottomRight.latitude - corners.bottomLeft.latitude);
+
+  return {
+    longitude: longitudeTop + v * (longitudeBottom - longitudeTop),
+    latitude: latitudeTop + v * (latitudeBottom - latitudeTop),
+  };
+}
 
 export default function App() {
   const [imageUrl, setImageUrl] = useState(null);
@@ -6,28 +119,40 @@ export default function App() {
   const [edges, setEdges] = useState([]);
   const [mode, setMode] = useState('ADD_NODE');
   const [nextNodeId, setNextNodeId] = useState(1);
-  const [nextEdgeId, setNextEdgeId] = useState(1); // NEW: Track edge IDs for hover targeting
+  const [nextEdgeId, setNextEdgeId] = useState(1);
   const [selectedNode, setSelectedNode] = useState(null);
   const [zoom, setZoom] = useState(1);
   const [history, setHistory] = useState([]);
 
   const [hoveredNodeId, setHoveredNodeId] = useState(null);
-  const [hoveredEdgeId, setHoveredEdgeId] = useState(null); // NEW: Track hovered edge
+  const [hoveredEdgeId, setHoveredEdgeId] = useState(null);
 
   const imgRef = useRef(null);
 
-  const [currentNodeName, setCurrentNodeName] = useState("Corridor");
-  const [currentNodeType, setCurrentNodeType] = useState("Joints");
+  const [currentNodeName, setCurrentNodeName] = useState('Corridor');
+  const [currentNodeType, setCurrentNodeType] = useState('Corridor');
   const [currentFloorplanId, setCurrentFloorplanId] = useState(1);
+  const [currentLongitude, setCurrentLongitude] = useState('');
+  const [currentLatitude, setCurrentLatitude] = useState('');
 
-  // Defaults for new edges
   const [currentIsAccessible, setCurrentIsAccessible] = useState(true);
-  const [currentEdgeType, setCurrentEdgeType] = useState("walkway");
+  const [currentEdgeType, setCurrentEdgeType] = useState('walkway');
 
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
       setImageUrl(URL.createObjectURL(file));
+    }
+  };
+
+  const handleNodeTypeChange = (event) => {
+    const nextType = event.target.value;
+    setCurrentNodeType(nextType);
+
+    if (nextType === COORDINATE_NODE_TYPE && currentNodeName === 'Corridor') {
+      setCurrentNodeName(COORDINATE_NODE_TYPE);
+    } else if (currentNodeName === COORDINATE_NODE_TYPE && nextType !== COORDINATE_NODE_TYPE) {
+      setCurrentNodeName(nextType);
     }
   };
 
@@ -39,14 +164,26 @@ export default function App() {
     const y = Math.round((e.clientY - rect.top) / zoom);
 
     if (mode === 'ADD_NODE') {
+      const isCoordinateNode = currentNodeType === COORDINATE_NODE_TYPE;
+      const longitude = parseCoordinateInput(currentLongitude);
+      const latitude = parseCoordinateInput(currentLatitude);
+
+      if (isCoordinateNode && (longitude === null || latitude === null)) {
+        alert('Enter valid longitude and latitude before placing a Coordinate node.');
+        return;
+      }
+
       const newNode = {
         id: nextNodeId,
         x,
         y,
         name: currentNodeName,
         type: currentNodeType,
-        floorplan_id: currentFloorplanId
+        floorplan_id: currentFloorplanId,
+        longitude: isCoordinateNode ? longitude : null,
+        latitude: isCoordinateNode ? latitude : null,
       };
+
       setNodes([...nodes, newNode]);
       setNextNodeId(nextNodeId + 1);
       setHistory([...history, 'NODE']);
@@ -56,6 +193,11 @@ export default function App() {
   const handleNodeClick = (e, node) => {
     e.stopPropagation();
     if (mode === 'ADD_EDGE') {
+      if (node.type === COORDINATE_NODE_TYPE) {
+        setSelectedNode(null);
+        return;
+      }
+
       if (!selectedNode) {
         setSelectedNode(node);
       } else {
@@ -64,15 +206,14 @@ export default function App() {
           const dy = node.y - selectedNode.y;
           const weight = Math.sqrt(dx * dx + dy * dy);
 
-          // NEW: Edges now store forward and backward accessibility independently
           const newEdge = {
             id: nextEdgeId,
             source: selectedNode.id,
             target: node.id,
             weight: weight,
-            is_accessible_fwd: currentIsAccessible, // Source -> Target
-            is_accessible_bwd: currentIsAccessible, // Target -> Source
-            edge_type: currentEdgeType
+            is_accessible_fwd: currentIsAccessible,
+            is_accessible_bwd: currentIsAccessible,
+            edge_type: currentEdgeType,
           };
 
           setEdges([...edges, newEdge]);
@@ -100,7 +241,7 @@ export default function App() {
   };
 
   const handleClearAll = () => {
-    if (window.confirm("Are you sure you want to clear the entire map? This cannot be undone.")) {
+    if (window.confirm('Are you sure you want to clear the entire map? This cannot be undone.')) {
       setNodes([]);
       setEdges([]);
       setHistory([]);
@@ -110,9 +251,8 @@ export default function App() {
     }
   };
 
-  // NEW: Toggle Edge Accessibility Direction
   const toggleEdgeAccess = (e, edgeId, direction) => {
-    e.stopPropagation(); // Stop click from bleeding into the canvas
+    e.stopPropagation();
     setEdges(edges.map(edge => {
       if (edge.id === edgeId) {
         return {
@@ -126,48 +266,76 @@ export default function App() {
   };
 
   const generateSQL = () => {
-    if (nodes.length === 0) return "No nodes added yet.";
+    const realNodes = nodes.filter(n => n.type !== COORDINATE_NODE_TYPE);
+    if (realNodes.length === 0) {
+      alert('No non-coordinate nodes added yet.');
+      return;
+    }
 
-    const nodeValues = nodes.map(n =>
-      `(${n.id}, '${n.name}', '${n.type}', ${n.floorplan_id}, ${n.x}, ${n.y})`
-    ).join(",\n");
+    const { corners, error } = getCoordinateCorners(nodes);
+    if (error) {
+      alert(error);
+      return;
+    }
 
-    // NEW: Split every physical line into TWO database edges
+    const nodeValues = realNodes.map(n => {
+      const { longitude, latitude } = interpolateGeoPosition(n, corners);
+      return `(${n.id}, '${escapeSql(n.name)}', '${escapeSql(n.type)}', ${n.floorplan_id}, ${n.x}, ${n.y}, ${longitude.toFixed(8)}, ${latitude.toFixed(8)})`;
+    }).join(',\n');
+
+    const realNodeIds = new Set(realNodes.map(n => n.id));
     const edgeValuesArray = [];
     edges.forEach(e => {
-      // Forward Edge (Source -> Target)
-      edgeValuesArray.push(
-        `(${e.source}, ${e.target}, ${e.weight.toFixed(2)}, ${e.is_accessible_fwd ? 'TRUE' : 'FALSE'}, '${e.edge_type}')`
-      );
-      // Backward Edge (Target -> Source)
-      edgeValuesArray.push(
-        `(${e.target}, ${e.source}, ${e.weight.toFixed(2)}, ${e.is_accessible_bwd ? 'TRUE' : 'FALSE'}, '${e.edge_type}')`
-      );
+      if (!realNodeIds.has(e.source) || !realNodeIds.has(e.target)) {
+        return;
+      }
+
+      const flags = edgeFlags(e.edge_type);
+      const flagValues = `${sqlBoolean(flags.is_bus)}, ${sqlBoolean(flags.is_sheltered)}, ${sqlBoolean(flags.is_keycard)}, ${sqlBoolean(flags.is_stair)}, ${sqlBoolean(flags.is_ramp)}, ${sqlBoolean(flags.is_elevator)}`;
+
+      if (e.is_accessible_fwd) {
+        edgeValuesArray.push(
+          `(${e.source}, ${e.target}, ${e.weight.toFixed(2)}, ${flagValues})`
+        );
+      }
+
+      if (e.is_accessible_bwd) {
+        edgeValuesArray.push(
+          `(${e.target}, ${e.source}, ${e.weight.toFixed(2)}, ${flagValues})`
+        );
+      }
     });
 
-    let sql = `-- Insert Nodes\nINSERT INTO nodes (node_id, node_name, node_type, floorplan_id, x_coord, y_coord) VALUES\n${nodeValues};\n`;
+    let sql = `-- Insert Nodes\nINSERT INTO nodes (node_id, node_name, node_type, floorplan_id, x_coordinate, y_coordinate, longitude, latitude) VALUES\n${nodeValues};\n`;
 
     if (edgeValuesArray.length > 0) {
-      sql += `\n-- Insert Edges (Two directed rows per connection)\nINSERT INTO edges (source, target, weight, is_accessible, edge_type) VALUES\n${edgeValuesArray.join(",\n")};`;
+      sql += `\n-- Insert Edges (Only enabled directions are generated)\nINSERT INTO edges (source_node_id, target_node_id, weight, is_bus, is_sheltered, is_keycard, is_stair, is_ramp, is_elevator) VALUES\n${edgeValuesArray.join(',\n')};`;
     }
 
     console.log(sql);
-    alert("SQL generated in browser console!");
+    alert('SQL generated in browser console!');
   };
 
-  // Helper to determine line color
   const getEdgeColor = (edge) => {
-    if (edge.is_accessible_fwd && edge.is_accessible_bwd) return 'rgba(46, 204, 113, 0.8)'; // Green (Two-way)
-    if (!edge.is_accessible_fwd && !edge.is_accessible_bwd) return 'rgba(231, 76, 60, 0.8)'; // Red (Blocked)
-    return 'rgba(243, 156, 18, 0.9)'; // Orange (One-way)
+    if (edge.is_accessible_fwd && edge.is_accessible_bwd) return 'rgba(46, 204, 113, 0.8)';
+    if (!edge.is_accessible_fwd && !edge.is_accessible_bwd) return 'rgba(231, 76, 60, 0.8)';
+    return 'rgba(243, 156, 18, 0.9)';
+  };
+
+  const getNodeColor = (node) => {
+    if (selectedNode?.id === node.id) return '#f1c40f';
+    if (node.type === COORDINATE_NODE_TYPE) return '#111827';
+    if (node.type === 'Room') return '#2ecc71';
+    if (node.type === 'Stair') return '#9b59b6';
+    if (node.type === 'Food') return '#f39c12';
+    if (node.type === 'Bus_stop') return '#3498db';
+    if (node.type === 'Toilet') return '#16a085';
+    return '#e74c3c';
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: 'sans-serif' }}>
-
-      {/* TOOLBAR */}
       <div style={{ padding: '15px', background: '#ecf0f1', display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'flex-start', borderBottom: '2px solid #bdc3c7', zIndex: 100 }}>
-
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <strong>1. Core Tools</strong>
           <input type="file" onChange={handleImageUpload} />
@@ -195,23 +363,30 @@ export default function App() {
           <label>Floorplan: <input type="number" value={currentFloorplanId} onChange={(e) => setCurrentFloorplanId(parseInt(e.target.value, 10) || 1)} style={{ width: '60px' }} /></label>
           <label>Name: <input type="text" value={currentNodeName} onChange={(e) => setCurrentNodeName(e.target.value)} /></label>
           <label>Type:
-            <select value={currentNodeType} onChange={(e) => setCurrentNodeType(e.target.value)} style={{ marginLeft: '5px' }}>
-              <option value="Door">Door</option>
-              <option value="Joints">Joints</option>
-              <option value="Staircase">Staircase</option>
+            <select value={currentNodeType} onChange={handleNodeTypeChange} style={{ marginLeft: '5px' }}>
+              {NODE_TYPES.map((type) => (
+                <option key={type} value={type}>{type}</option>
+              ))}
             </select>
           </label>
+          {currentNodeType === COORDINATE_NODE_TYPE && (
+            <>
+              <label>Longitude: <input type="number" step="any" value={currentLongitude} onChange={(e) => setCurrentLongitude(e.target.value)} style={{ width: '140px' }} /></label>
+              <label>Latitude: <input type="number" step="any" value={currentLatitude} onChange={(e) => setCurrentLatitude(e.target.value)} style={{ width: '140px' }} /></label>
+            </>
+          )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }}>
           <strong>3. Default Edge Settings</strong>
-          <label>Type:
+          <label>Tag:
             <select value={currentEdgeType} onChange={(e) => setCurrentEdgeType(e.target.value)} style={{ marginLeft: '5px' }}>
-              <option value="walkway">Walkway</option>
-              <option value="staircase">Staircase</option>
+              {EDGE_TAGS.map((tag) => (
+                <option key={tag.value} value={tag.value}>{tag.label}</option>
+              ))}
             </select>
           </label>
-          <label><input type="checkbox" checked={currentIsAccessible} onChange={(e) => setCurrentIsAccessible(e.target.checked)} /> Default Accessible (2-Way)</label>
+          <label><input type="checkbox" checked={currentIsAccessible} onChange={(e) => setCurrentIsAccessible(e.target.checked)} /> Default Enabled (2-Way)</label>
         </div>
 
         {imageUrl && (
@@ -222,11 +397,9 @@ export default function App() {
         )}
       </div>
 
-      {/* CANVAS AREA */}
       <div style={{ flex: 1, overflow: 'auto', background: '#95a5a6', position: 'relative' }}>
         {imageUrl && (
           <div style={{ position: 'relative', transform: `scale(${zoom})`, transformOrigin: 'top left', display: 'inline-block' }}>
-
             <img ref={imgRef} src={imageUrl} alt="Floorplan" onClick={handleCanvasClick} style={{ cursor: mode === 'ADD_NODE' ? 'crosshair' : 'default', display: 'block' }} />
 
             <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
@@ -237,10 +410,7 @@ export default function App() {
 
                 return (
                   <g key={edge.id} style={{ pointerEvents: 'stroke' }}>
-                    {/* The Visible Line */}
                     <line x1={sourceNode.x} y1={sourceNode.y} x2={targetNode.x} y2={targetNode.y} stroke={getEdgeColor(edge)} strokeWidth="4" />
-
-                    {/* The Invisible Thick Line (Acts as a large hitbox for mouse hover) */}
                     <line
                       x1={sourceNode.x} y1={sourceNode.y} x2={targetNode.x} y2={targetNode.y}
                       stroke="transparent" strokeWidth="25"
@@ -252,7 +422,6 @@ export default function App() {
               })}
             </svg>
 
-            {/* EDGE HOVER MENU: Rendered as HTML over the SVG for UI controls */}
             {edges.map((edge) => {
               if (hoveredEdgeId !== edge.id) return null;
 
@@ -260,14 +429,13 @@ export default function App() {
               const targetNode = nodes.find(n => n.id === edge.target);
               if (!sourceNode || !targetNode) return null;
 
-              // Calculate midpoint to place the popup
               const midX = (sourceNode.x + targetNode.x) / 2;
               const midY = (sourceNode.y + targetNode.y) / 2;
 
               return (
                 <div
                   key={`menu-${edge.id}`}
-                  onMouseEnter={() => setHoveredEdgeId(edge.id)} // Keeps menu open if mouse moves slightly off the line
+                  onMouseEnter={() => setHoveredEdgeId(edge.id)}
                   onMouseLeave={() => setHoveredEdgeId(null)}
                   style={{
                     position: 'absolute',
@@ -285,7 +453,7 @@ export default function App() {
                     gap: '4px',
                     fontSize: '12px',
                     fontWeight: 'bold',
-                    pointerEvents: 'all' // Allows clicking the checkboxes
+                    pointerEvents: 'all'
                   }}
                 >
                   <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
@@ -312,11 +480,9 @@ export default function App() {
                   top: node.y - 8,
                   width: '16px',
                   height: '16px',
-                  background: selectedNode?.id === node.id ? '#f1c40f' :
-                    (node.type === 'Door' ? '#2ecc71' :
-                      (node.type === 'Staircase' ? '#9b59b6' : '#e74c3c')),
-                  borderRadius: '50%',
-                  cursor: mode === 'ADD_EDGE' ? 'pointer' : 'default',
+                  background: getNodeColor(node),
+                  borderRadius: node.type === COORDINATE_NODE_TYPE ? '2px' : '50%',
+                  cursor: mode === 'ADD_EDGE' && node.type !== COORDINATE_NODE_TYPE ? 'pointer' : 'default',
                   border: '2px solid white',
                   boxShadow: '0 0 4px rgba(0,0,0,0.5)',
                   zIndex: hoveredNodeId === node.id ? 50 : 10
@@ -339,6 +505,7 @@ export default function App() {
                     pointerEvents: 'none'
                   }}>
                     {node.id}: {node.name}
+                    {node.type === COORDINATE_NODE_TYPE && ` (${node.longitude}, ${node.latitude})`}
                   </span>
                 )}
               </div>
