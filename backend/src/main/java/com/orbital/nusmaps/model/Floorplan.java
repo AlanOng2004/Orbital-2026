@@ -1,11 +1,13 @@
 package com.orbital.nusmaps.model;
 
+import jakarta.persistence.CascadeType;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import java.util.ArrayList;
+import java.util.List;
 
 import jakarta.persistence.Index;
 import jakarta.persistence.Column;
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -14,8 +16,6 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
 @Table(
@@ -73,12 +73,27 @@ public class Floorplan {
         return building;
     }
 
-    public void setBuilding(Building building) {
-        this.building = building;
+    public void setBuilding(Building building) { this.building = building; }
 
-        // Update nodes' faculty
+    public void updateBuildingWNodes(Building building) {
+        if (this.building == building) { return; }
+
+        Faculty f1 = this.building == null
+                ? null
+                : this.building.getFaculty();
+        Faculty f2 = building == null
+                ? null
+                : building.getFaculty();
+
+        if (f1 != f2) {
+            updateNodesFaculty(f2);
+        }
+        this.building = building;
+    }
+
+    public void updateNodesFaculty(Faculty faculty) {
         for (Node n : nodes) {
-            n.setFloorplan(this);
+            n.setFaculty(faculty);
         }
     }
 

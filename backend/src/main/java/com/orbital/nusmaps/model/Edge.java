@@ -1,9 +1,10 @@
 package com.orbital.nusmaps.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-
 import java.util.ArrayList;
 import java.util.List;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 
 import jakarta.persistence.Index;
 import jakarta.persistence.Column;
@@ -175,4 +176,30 @@ public class Edge {
     }
 
     public List<InstantiatedEdge> getEdgeList() { return edgeList; }
+
+    public void setEdgeList(List<InstantiatedEdge> edgeList) {
+        this.edgeList.clear();
+        if (edgeList == null) {
+            return;
+        }
+        for (InstantiatedEdge edgeInstance : edgeList) {
+            addEdgeInstance(edgeInstance);
+        }
+    }
+
+    public void addEdgeInstance(EdgeList edgeInstance) {
+        if (edgeInstance == null) {
+            return;
+        }
+        edgeList.add(edgeInstance);
+        edgeInstance.setEdge(this);
+    }
+
+    public void removeEdgeInstance(EdgeList edgeInstance) {
+        if (edgeInstance == null) {
+            return;
+        }
+        edgeList.remove(edgeInstance);
+        edgeInstance.setEdge(null);
+    }
 }

@@ -1,18 +1,18 @@
 package com.orbital.nusmaps.model;
 
+import jakarta.persistence.CascadeType;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Arrays;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 
 import jakarta.persistence.Index;
 import jakarta.persistence.Column;
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -158,12 +158,18 @@ public class Node {
 
     public Floorplan getFloorplan() { return floorplan; }
 
-    public void setFloorplan(Floorplan floorplan) {
+    public void setFloorplan(Floorplan floorplan) { this.floorplan = floorplan; }
+
+    public void updateFloorplanWFaculty(Floorplan floorplan) {
         this.floorplan = floorplan;
         if (floorplan != null && floorplan.getBuilding() != null) {
             this.faculty = floorplan.getBuilding().getFaculty();
         } else { this.faculty = null; }
     }
+
+    public Faculty getFaculty() { return faculty; }
+
+    public void setFaculty(Faculty faculty) { this.faculty = faculty; }
 
     public String getRoomPolygon() { return this.roomPolygon; }
 
@@ -219,8 +225,6 @@ public class Node {
         }
     }
 
-    public Faculty getFaculty() { return faculty; }
-
     public List<NodeAlias> getAliases() { return aliases; }
 
     public void setAliases(List<NodeAlias> aliases) {
@@ -252,10 +256,42 @@ public class Node {
     public List<SavedPlace> getSavedPlaces() {
         return savedPlaces;
     }
+
+    public void setSavedPlaces(List<SavedPlace> savedPlaces) {
+        this.savedPlaces.clear();
+        if (savedPlaces == null) {
+            return;
+        }
+        for (SavedPlace savedPlace : savedPlaces) {
+            addAlias(savedPlace);
+        }
+    }
+
+    public void addSavedPlace(SavedPlace savedPlace) {
+        if (savedPlace == null) {
+            return;
+        }
+        savedPlaces.add(savedPlace);
+        savedPlace.setNode(this);
+    }
+
+    public void removeSavedPlace(SavedPlace savedPlace) {
+        if (savedPlace == null) {
+            return;
+        }
+        savedPlaces.remove(savedPlace);
+        savedPlace.setNode(null);
+    }
+
     public List<SavedRoute> getRoutesStarting() {
         return routesStarting;
     }
+
+    public void setRoutesStarting(List<SavedRoutes> routesStarting) { this.routesStarting = routesStarting; }
+
     public List<SavedRoute> getRoutesEnding() {
         return routesEnding;
     }
+
+    public void savedRoutesEnding(List<SavedRoutes> routesEnding) { this.routesEnding = routesEnding; }
 }
