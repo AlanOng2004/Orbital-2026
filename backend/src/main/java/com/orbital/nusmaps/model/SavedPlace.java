@@ -2,6 +2,8 @@ package com.orbital.nusmaps.model;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import java.time.LocalDateTime;
 
 import jakarta.persistence.UniqueConstraint;
