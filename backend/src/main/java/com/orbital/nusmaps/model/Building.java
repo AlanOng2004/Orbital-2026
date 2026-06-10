@@ -101,7 +101,7 @@ public class Building {
         for (Floorplan fp : floorplans) {
             fp.updateNodesFaculty(faculty);
         }
-        this.building = building;
+        this.faculty = faculty;
     }
 
     public String getBuildingPolygon() {

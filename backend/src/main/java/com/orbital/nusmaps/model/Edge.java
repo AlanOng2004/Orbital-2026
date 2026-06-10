@@ -187,7 +187,7 @@ public class Edge {
         }
     }
 
-    public void addEdgeInstance(EdgeList edgeInstance) {
+    public void addEdgeInstance(InstantiatedEdge edgeInstance) {
         if (edgeInstance == null) {
             return;
         }
@@ -195,7 +195,7 @@ public class Edge {
         edgeInstance.setEdge(this);
     }
 
-    public void removeEdgeInstance(EdgeList edgeInstance) {
+    public void removeEdgeInstance(InstantiatedEdge edgeInstance) {
         if (edgeInstance == null) {
             return;
         }

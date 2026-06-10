@@ -263,7 +263,7 @@ public class Node {
             return;
         }
         for (SavedPlace savedPlace : savedPlaces) {
-            addAlias(savedPlace);
+            addSavedPlace(savedPlace);
         }
     }
 
@@ -287,11 +287,11 @@ public class Node {
         return routesStarting;
     }
 
-    public void setRoutesStarting(List<SavedRoutes> routesStarting) { this.routesStarting = routesStarting; }
+    public void setRoutesStarting(List<SavedRoute> routesStarting) { this.routesStarting = routesStarting; }
 
     public List<SavedRoute> getRoutesEnding() {
         return routesEnding;
     }
 
-    public void savedRoutesEnding(List<SavedRoutes> routesEnding) { this.routesEnding = routesEnding; }
+    public void setRoutesEnding(List<SavedRoute> routesEnding) { this.routesEnding = routesEnding; }
 }

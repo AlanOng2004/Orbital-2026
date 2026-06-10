@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import { useState } from "react";
 import { campusConfig } from "./mapData";
 
 export default function App() {
@@ -52,7 +52,7 @@ export default function App() {
 
   const results =
     searchQuery.length > 1
-      ? Object.entries(campusConfig.buildings).filter(([key, b]) =>
+      ? Object.entries(campusConfig.buildings).filter(([, b]) =>
           b.name.toLowerCase().includes(searchQuery.toLowerCase()),
         )
       : [];
