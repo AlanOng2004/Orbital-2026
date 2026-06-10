@@ -74,6 +74,7 @@ public class AdminAnnotatorImportController {
             );
 
             Node node = new Node();
+            double[] geoPosition = normalizeGeoPosition(nodeRequest.getLongitude(), nodeRequest.getLatitude());
             node.setNodeName(nodeRequest.getNodeName().trim());
             node.setDualName(blankToNull(nodeRequest.getDualName()));
             node.setNodeType(parseNodeType(nodeRequest.getNodeType()));
@@ -81,8 +82,8 @@ public class AdminAnnotatorImportController {
             node.setRoomPolygon(blankToNull(nodeRequest.getRoomPolygon()));
             node.setXCoordinate(nodeRequest.getXCoordinate());
             node.setYCoordinate(nodeRequest.getYCoordinate());
-            node.setLongitude(nodeRequest.getLongitude());
-            node.setLatitude(nodeRequest.getLatitude());
+            node.setLongitude(geoPosition[0]);
+            node.setLatitude(geoPosition[1]);
 
             Node savedNode = nodeRepository.save(node);
             savedNodesByTempId.put(nodeRequest.getTempId(), savedNode);
@@ -121,7 +122,7 @@ public class AdminAnnotatorImportController {
         if (nodeRequest.getXCoordinate() == null || nodeRequest.getYCoordinate() == null) {
             throw new IllegalArgumentException("X and Y coordinates are required for tempId: " + nodeRequest.getTempId());
         }
-        if (nodeRequest.getLongitude() == null || nodeRequest.getLatitude() == null) {
+        if (!hasValidGeoPosition(nodeRequest.getLongitude(), nodeRequest.getLatitude())) {
             throw new IllegalArgumentException("Longitude and latitude are required for tempId: " + nodeRequest.getTempId());
         }
 
@@ -178,5 +179,29 @@ public class AdminAnnotatorImportController {
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private boolean hasValidGeoPosition(Double longitude, Double latitude) {
+        if (longitude == null || latitude == null) {
+            return false;
+        }
+
+        double[] geoPosition = normalizeGeoPosition(longitude, latitude);
+        return !(geoPosition[0] == 0 && geoPosition[1] == 0) &&
+            Math.abs(geoPosition[0]) <= 180 &&
+            Math.abs(geoPosition[1]) <= 90;
+    }
+
+    private double[] normalizeGeoPosition(Double longitude, Double latitude) {
+        if (longitude != null &&
+            latitude != null &&
+            Math.abs(longitude) <= 90 &&
+            Math.abs(latitude) > 90 &&
+            Math.abs(latitude) <= 180
+        ) {
+            return new double[] { latitude, longitude };
+        }
+
+        return new double[] { longitude, latitude };
     }
 }

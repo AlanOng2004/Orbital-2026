@@ -77,6 +77,32 @@ function toNumber(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function isZeroGeo(longitude, latitude) {
+  return longitude === 0 && latitude === 0;
+}
+
+function normalizeGeoPosition(longitude, latitude) {
+  if (longitude === null || latitude === null) {
+    return { longitude, latitude };
+  }
+
+  // Singapore-style coordinates are easy to swap accidentally:
+  // longitude should be around 103.x, latitude around 1.x.
+  if (Math.abs(longitude) <= 90 && Math.abs(latitude) > 90 && Math.abs(latitude) <= 180) {
+    return { longitude: latitude, latitude: longitude };
+  }
+
+  return { longitude, latitude };
+}
+
+function hasValidGeoPosition(longitude, latitude) {
+  return longitude !== null &&
+    latitude !== null &&
+    !isZeroGeo(longitude, latitude) &&
+    Math.abs(longitude) <= 180 &&
+    Math.abs(latitude) <= 90;
+}
+
 function getNodeX(node) {
   return toNumber(node.xCoordinate ?? node.x_coordinate ?? node.x);
 }
@@ -104,13 +130,20 @@ function getEdgeTargetTempId(edge) {
 function getCoordinateNodes(nodes) {
   const coordinateNodes = nodes
     .filter((node) => getNodeType(node) === COORDINATE_NODE_TYPE)
-    .map((node) => ({
-      ...node,
-      x: getNodeX(node),
-      y: getNodeY(node),
-      longitude: toNumber(node.longitude),
-      latitude: toNumber(node.latitude),
-    }));
+    .map((node) => {
+      const { longitude, latitude } = normalizeGeoPosition(
+        toNumber(node.longitude),
+        toNumber(node.latitude),
+      );
+
+      return {
+        ...node,
+        x: getNodeX(node),
+        y: getNodeY(node),
+        longitude,
+        latitude,
+      };
+    });
 
   if (coordinateNodes.length < 3) {
     return {
@@ -122,13 +155,12 @@ function getCoordinateNodes(nodes) {
     (node) =>
       !Number.isFinite(node.x) ||
       !Number.isFinite(node.y) ||
-      !Number.isFinite(node.longitude) ||
-      !Number.isFinite(node.latitude),
+      !hasValidGeoPosition(node.longitude, node.latitude),
   );
 
   if (invalidCoordinate) {
     return {
-      error: `Coordinate node ${invalidCoordinate.id} is missing valid x, y, longitude, or latitude.`,
+      error: `Coordinate node ${invalidCoordinate.id} is missing valid x, y, longitude, or latitude. Longitude should look like 103.x and latitude should look like 1.x for NUS.`,
     };
   }
 
@@ -207,10 +239,12 @@ function getNodeImportFields(node, coordinateNodes = [], defaultFloorplanId = nu
   const nodeType = node.nodeType ?? node.type;
   const xCoordinate = getNodeX(node);
   const yCoordinate = getNodeY(node);
-  let longitude = toNumber(node.longitude);
-  let latitude = toNumber(node.latitude);
+  let { longitude, latitude } = normalizeGeoPosition(
+    toNumber(node.longitude),
+    toNumber(node.latitude),
+  );
 
-  if ((longitude === null || latitude === null) && coordinateNodes.length > 0) {
+  if (!hasValidGeoPosition(longitude, latitude) && coordinateNodes.length > 0) {
     const interpolated = interpolateGeoPosition(
       { ...node, x: xCoordinate, y: yCoordinate },
       coordinateNodes,
@@ -252,7 +286,10 @@ function buildImportPayload(graph, defaultFloorplanId = null) {
   const inputNodes = graph.nodes;
   const realNodes = inputNodes.filter((node) => getNodeType(node) !== COORDINATE_NODE_TYPE);
   const needsInterpolation = realNodes.some((node) =>
-    toNumber(node.longitude) === null || toNumber(node.latitude) === null
+    !hasValidGeoPosition(
+      normalizeGeoPosition(toNumber(node.longitude), toNumber(node.latitude)).longitude,
+      normalizeGeoPosition(toNumber(node.longitude), toNumber(node.latitude)).latitude,
+    )
   );
   let nodesForImport = realNodes;
   let coordinateNodes = [];
@@ -277,8 +314,7 @@ function buildImportPayload(graph, defaultFloorplanId = null) {
     node.floorplanId === null ||
     node.xCoordinate === null ||
     node.yCoordinate === null ||
-    node.longitude === null ||
-    node.latitude === null
+    !hasValidGeoPosition(node.longitude, node.latitude)
   );
 
   if (invalidNode) {
@@ -443,11 +479,13 @@ export default function App() {
 
     if (mode === 'ADD_NODE') {
       const isCoordinateNode = currentNodeType === COORDINATE_NODE_TYPE;
-      const longitude = parseCoordinateInput(currentLongitude);
-      const latitude = parseCoordinateInput(currentLatitude);
+      const { longitude, latitude } = normalizeGeoPosition(
+        parseCoordinateInput(currentLongitude),
+        parseCoordinateInput(currentLatitude),
+      );
 
-      if (isCoordinateNode && (longitude === null || latitude === null)) {
-        alert('Enter valid longitude and latitude before placing a Coordinate node.');
+      if (isCoordinateNode && !hasValidGeoPosition(longitude, latitude)) {
+        alert('Enter valid longitude and latitude before placing a Coordinate node. For NUS, longitude should look like 103.x and latitude should look like 1.x.');
         return;
       }
 
@@ -677,8 +715,8 @@ export default function App() {
           </label>
           {currentNodeType === COORDINATE_NODE_TYPE && (
             <>
-              <label>Longitude: <input type="number" step="any" value={currentLongitude} onChange={(e) => setCurrentLongitude(e.target.value)} style={{ width: '140px' }} /></label>
-              <label>Latitude: <input type="number" step="any" value={currentLatitude} onChange={(e) => setCurrentLatitude(e.target.value)} style={{ width: '140px' }} /></label>
+              <label>Longitude (103.x): <input type="number" step="any" value={currentLongitude} onChange={(e) => setCurrentLongitude(e.target.value)} style={{ width: '140px' }} /></label>
+              <label>Latitude (1.x): <input type="number" step="any" value={currentLatitude} onChange={(e) => setCurrentLatitude(e.target.value)} style={{ width: '140px' }} /></label>
             </>
           )}
         </div>
