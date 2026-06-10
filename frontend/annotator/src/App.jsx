@@ -13,14 +13,13 @@ const NODE_TYPES = [
   COORDINATE_NODE_TYPE,
 ];
 
-const EDGE_TAGS = [
-  { value: 'walkway', label: 'Walkway' },
-  { value: 'Bus', label: 'Bus' },
-  { value: 'Sheltered', label: 'Sheltered' },
-  { value: 'Keycard', label: 'Keycard' },
-  { value: 'Stair', label: 'Stair' },
-  { value: 'Ramp', label: 'Ramp' },
-  { value: 'Elevator', label: 'Elevator' },
+const EDGE_FLAGS = [
+  { key: 'isBus', legacyKey: 'is_bus', label: 'Bus' },
+  { key: 'isSheltered', legacyKey: 'is_sheltered', label: 'Sheltered' },
+  { key: 'isKeycard', legacyKey: 'is_keycard', label: 'Keycard' },
+  { key: 'isStair', legacyKey: 'is_stair', label: 'Stair' },
+  { key: 'isRamp', legacyKey: 'is_ramp', label: 'Ramp' },
+  { key: 'isElevator', legacyKey: 'is_elevator', label: 'Elevator' },
 ];
 
 const toolbarPanelStyle = {
@@ -49,15 +48,24 @@ function parseCoordinateInput(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function edgeFlags(edgeType) {
+function legacyEdgeTypeFlags(edgeType) {
   return {
-    is_bus: edgeType === 'Bus',
-    is_sheltered: edgeType === 'Bus' || edgeType === 'Sheltered',
-    is_keycard: edgeType === 'Keycard',
-    is_stair: edgeType === 'Stair',
-    is_ramp: edgeType === 'Ramp',
-    is_elevator: edgeType === 'Elevator',
+    isBus: edgeType === 'Bus',
+    isSheltered: edgeType === 'Bus' || edgeType === 'Sheltered',
+    isKeycard: edgeType === 'Keycard',
+    isStair: edgeType === 'Stair',
+    isRamp: edgeType === 'Ramp',
+    isElevator: edgeType === 'Elevator',
   };
+}
+
+function normalizeEdgeFlags(edge = {}) {
+  const legacyFlags = legacyEdgeTypeFlags(edge.edge_type ?? edge.edgeType ?? 'walkway');
+
+  return EDGE_FLAGS.reduce((flags, { key, legacyKey }) => ({
+    ...flags,
+    [key]: Boolean(edge[key] ?? edge[legacyKey] ?? legacyFlags[key]),
+  }), {});
 }
 
 function sqlBoolean(value) {
@@ -79,6 +87,18 @@ function getNodeY(node) {
 
 function getNodeType(node) {
   return node.nodeType ?? node.type;
+}
+
+function getNodeTempId(node) {
+  return toNumber(node.tempId ?? node.id);
+}
+
+function getEdgeSourceTempId(edge) {
+  return toNumber(edge.sourceTempId ?? edge.source_temp_id ?? edge.source);
+}
+
+function getEdgeTargetTempId(edge) {
+  return toNumber(edge.targetTempId ?? edge.target_temp_id ?? edge.target);
 }
 
 function getCoordinateNodes(nodes) {
@@ -200,7 +220,7 @@ function getNodeImportFields(node, coordinateNodes = [], defaultFloorplanId = nu
   }
 
   return {
-    tempId: toNumber(node.tempId ?? node.id),
+    tempId: getNodeTempId(node),
     nodeName: node.nodeName ?? node.name,
     dualName: node.dualName ?? node.dual_name ?? null,
     nodeType,
@@ -214,18 +234,13 @@ function getNodeImportFields(node, coordinateNodes = [], defaultFloorplanId = nu
 }
 
 function getEdgeImportFields(edge, sourceTempId, targetTempId) {
-  const flags = edgeFlags(edge.edge_type ?? edge.edgeType ?? 'walkway');
+  const flags = normalizeEdgeFlags(edge);
 
   return {
     sourceTempId,
     targetTempId,
     weight: toNumber(edge.weight),
-    isBus: Boolean(edge.isBus ?? edge.is_bus ?? flags.is_bus),
-    isSheltered: Boolean(edge.isSheltered ?? edge.is_sheltered ?? flags.is_sheltered),
-    isKeycard: Boolean(edge.isKeycard ?? edge.is_keycard ?? flags.is_keycard),
-    isStair: Boolean(edge.isStair ?? edge.is_stair ?? flags.is_stair),
-    isRamp: Boolean(edge.isRamp ?? edge.is_ramp ?? flags.is_ramp),
-    isElevator: Boolean(edge.isElevator ?? edge.is_elevator ?? flags.is_elevator),
+    ...flags,
   };
 }
 
@@ -255,25 +270,58 @@ function buildImportPayload(graph, defaultFloorplanId = null) {
   const nodes = nodesForImport.map((node) =>
     getNodeImportFields(node, coordinateNodes, defaultFloorplanId)
   );
+  const invalidNode = nodes.find((node) =>
+    node.tempId === null ||
+    !node.nodeName ||
+    !node.nodeType ||
+    node.floorplanId === null ||
+    node.xCoordinate === null ||
+    node.yCoordinate === null ||
+    node.longitude === null ||
+    node.latitude === null
+  );
+
+  if (invalidNode) {
+    throw new Error(`Node ${invalidNode.tempId ?? '(missing tempId)'} is missing required database fields.`);
+  }
+
+  const realNodeTempIds = new Set(nodes.map((node) => node.tempId));
   const rawEdges = Array.isArray(graph.edges) ? graph.edges : [];
   const edges = rawEdges.flatMap((edge) => {
-    if (edge.sourceTempId != null || edge.targetTempId != null) {
-      return [getEdgeImportFields(edge, toNumber(edge.sourceTempId), toNumber(edge.targetTempId))];
-    }
-
-    const sourceTempId = toNumber(edge.source);
-    const targetTempId = toNumber(edge.target);
+    const sourceTempId = getEdgeSourceTempId(edge);
+    const targetTempId = getEdgeTargetTempId(edge);
     const expandedEdges = [];
 
-    if (edge.is_accessible_fwd !== false) {
-      expandedEdges.push(getEdgeImportFields(edge, sourceTempId, targetTempId));
+    if (!realNodeTempIds.has(sourceTempId) || !realNodeTempIds.has(targetTempId)) {
+      throw new Error(`Edge references unknown or coordinate node IDs: ${sourceTempId} -> ${targetTempId}.`);
     }
-    if (edge.is_accessible_bwd === true) {
-      expandedEdges.push(getEdgeImportFields(edge, targetTempId, sourceTempId));
+
+    if (edge.is_accessible_fwd !== undefined || edge.is_accessible_bwd !== undefined) {
+      if (edge.is_accessible_fwd !== false) {
+        expandedEdges.push(getEdgeImportFields(edge, sourceTempId, targetTempId));
+      }
+      if (edge.is_accessible_bwd === true) {
+        expandedEdges.push(getEdgeImportFields(edge, targetTempId, sourceTempId));
+      }
+      return expandedEdges;
+    }
+
+    if (sourceTempId !== null && targetTempId !== null) {
+      expandedEdges.push(getEdgeImportFields(edge, sourceTempId, targetTempId));
     }
 
     return expandedEdges;
   });
+  const invalidEdge = edges.find((edge) =>
+    edge.sourceTempId === null ||
+    edge.targetTempId === null ||
+    edge.weight === null ||
+    edge.weight < 0
+  );
+
+  if (invalidEdge) {
+    throw new Error(`Edge ${invalidEdge.sourceTempId ?? '?'} -> ${invalidEdge.targetTempId ?? '?'} is missing required database fields.`);
+  }
 
   return { nodes, edges };
 }
@@ -316,8 +364,15 @@ export default function App() {
   const [currentLongitude, setCurrentLongitude] = useState('');
   const [currentLatitude, setCurrentLatitude] = useState('');
 
-  const [currentIsAccessible, setCurrentIsAccessible] = useState(true);
-  const [currentEdgeType, setCurrentEdgeType] = useState('walkway');
+  const [createReverseEdge, setCreateReverseEdge] = useState(true);
+  const [defaultEdgeFlags, setDefaultEdgeFlags] = useState({
+    isBus: false,
+    isSheltered: false,
+    isKeycard: false,
+    isStair: false,
+    isRamp: false,
+    isElevator: false,
+  });
 
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
@@ -429,19 +484,27 @@ export default function App() {
           const dy = node.y - selectedNode.y;
           const weight = Math.sqrt(dx * dx + dy * dy);
 
-          const newEdge = {
+          const edgeBase = {
             id: nextEdgeId,
-            source: selectedNode.id,
-            target: node.id,
-            weight: weight,
-            is_accessible_fwd: currentIsAccessible,
-            is_accessible_bwd: currentIsAccessible,
-            edge_type: currentEdgeType,
+            sourceTempId: selectedNode.id,
+            targetTempId: node.id,
+            weight,
+            ...defaultEdgeFlags,
           };
+          const newEdges = [edgeBase];
 
-          setEdges([...edges, newEdge]);
-          setNextEdgeId(nextEdgeId + 1);
-          setHistory([...history, 'EDGE']);
+          if (createReverseEdge) {
+            newEdges.push({
+              ...edgeBase,
+              id: nextEdgeId + 1,
+              sourceTempId: node.id,
+              targetTempId: selectedNode.id,
+            });
+          }
+
+          setEdges([...edges, ...newEdges]);
+          setNextEdgeId(nextEdgeId + newEdges.length);
+          setHistory([...history, { type: 'EDGE', count: newEdges.length }]);
         }
         setSelectedNode(null);
       }
@@ -451,14 +514,16 @@ export default function App() {
   const handleUndo = () => {
     if (history.length === 0) return;
     const lastAction = history[history.length - 1];
+    const actionType = typeof lastAction === 'string' ? lastAction : lastAction.type;
+    const actionCount = typeof lastAction === 'string' ? 1 : lastAction.count;
 
-    if (lastAction === 'NODE') {
+    if (actionType === 'NODE') {
       setNodes(nodes.slice(0, -1));
       setNextNodeId(prev => Math.max(1, prev - 1));
       setSelectedNode(null);
-    } else if (lastAction === 'EDGE') {
-      setEdges(edges.slice(0, -1));
-      setNextEdgeId(prev => Math.max(1, prev - 1));
+    } else if (actionType === 'EDGE') {
+      setEdges(edges.slice(0, -actionCount));
+      setNextEdgeId(prev => Math.max(1, prev - actionCount));
     }
     setHistory(history.slice(0, -1));
   };
@@ -474,14 +539,20 @@ export default function App() {
     }
   };
 
-  const toggleEdgeAccess = (e, edgeId, direction) => {
+  const toggleDefaultEdgeFlag = (key) => {
+    setDefaultEdgeFlags((flags) => ({
+      ...flags,
+      [key]: !flags[key],
+    }));
+  };
+
+  const toggleEdgeFlag = (e, edgeId, key) => {
     e.stopPropagation();
     setEdges(edges.map(edge => {
       if (edge.id === edgeId) {
         return {
           ...edge,
-          is_accessible_fwd: direction === 'fwd' ? !edge.is_accessible_fwd : edge.is_accessible_fwd,
-          is_accessible_bwd: direction === 'bwd' ? !edge.is_accessible_bwd : edge.is_accessible_bwd,
+          [key]: !edge[key],
         };
       }
       return edge;
@@ -489,42 +560,26 @@ export default function App() {
   };
 
   const generateSQL = () => {
-    const { nodesWithCoordinates, error } = getNodesWithCalculatedCoordinates(nodes);
-    if (error) {
-      alert(error);
+    let payload;
+    try {
+      payload = buildImportPayload({ nodes, edges }, currentFloorplanId);
+    } catch (error) {
+      alert(error.message);
       return;
     }
 
-    if (nodesWithCoordinates.length === 0) {
+    if (payload.nodes.length === 0) {
       alert('No non-coordinate nodes added yet.');
       return;
     }
 
-    const nodeValues = nodesWithCoordinates.map(n =>
-      `(${n.id}, '${escapeSql(n.name)}', '${escapeSql(n.type)}', ${n.floorplan_id}, ${n.x}, ${n.y}, ${n.longitude.toFixed(8)}, ${n.latitude.toFixed(8)})`
+    const nodeValues = payload.nodes.map(n =>
+      `(${n.tempId}, '${escapeSql(n.nodeName)}', '${escapeSql(n.nodeType)}', ${n.floorplanId}, ${n.xCoordinate}, ${n.yCoordinate}, ${n.longitude.toFixed(8)}, ${n.latitude.toFixed(8)})`
     ).join(',\n');
 
-    const realNodeIds = new Set(nodesWithCoordinates.map(n => n.id));
-    const edgeValuesArray = [];
-    edges.forEach(e => {
-      if (!realNodeIds.has(e.source) || !realNodeIds.has(e.target)) {
-        return;
-      }
-
-      const flags = edgeFlags(e.edge_type);
-      const flagValues = `${sqlBoolean(flags.is_bus)}, ${sqlBoolean(flags.is_sheltered)}, ${sqlBoolean(flags.is_keycard)}, ${sqlBoolean(flags.is_stair)}, ${sqlBoolean(flags.is_ramp)}, ${sqlBoolean(flags.is_elevator)}`;
-
-      if (e.is_accessible_fwd) {
-        edgeValuesArray.push(
-          `(${e.source}, ${e.target}, ${e.weight.toFixed(2)}, ${flagValues})`
-        );
-      }
-
-      if (e.is_accessible_bwd) {
-        edgeValuesArray.push(
-          `(${e.target}, ${e.source}, ${e.weight.toFixed(2)}, ${flagValues})`
-        );
-      }
+    const edgeValuesArray = payload.edges.map(e => {
+      const flagValues = `${sqlBoolean(e.isBus)}, ${sqlBoolean(e.isSheltered)}, ${sqlBoolean(e.isKeycard)}, ${sqlBoolean(e.isStair)}, ${sqlBoolean(e.isRamp)}, ${sqlBoolean(e.isElevator)}`;
+      return `(${e.sourceTempId}, ${e.targetTempId}, ${e.weight.toFixed(2)}, ${flagValues})`;
     });
 
     let sql = `-- Insert Nodes\nINSERT INTO nodes (node_id, node_name, node_type, floorplan_id, x_coordinate, y_coordinate, longitude, latitude) VALUES\n${nodeValues};\n`;
@@ -538,27 +593,27 @@ export default function App() {
   };
 
   const exportJson = () => {
-    const { nodesWithCoordinates, error } = getNodesWithCalculatedCoordinates(nodes);
-    if (error) {
-      alert(error);
+    let payload;
+    try {
+      payload = buildImportPayload({ nodes, edges }, currentFloorplanId);
+    } catch (error) {
+      alert(error.message);
       return;
     }
 
-    downloadJson(`annotator-floorplan-${currentFloorplanId}.json`, {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      nodes: [
-        ...nodes.filter(node => getNodeType(node) === COORDINATE_NODE_TYPE),
-        ...nodesWithCoordinates,
-      ],
-      edges,
-    });
+    downloadJson(`annotator-floorplan-${currentFloorplanId}-db-import.json`, payload);
   };
 
   const getEdgeColor = (edge) => {
-    if (edge.is_accessible_fwd && edge.is_accessible_bwd) return 'rgba(46, 204, 113, 0.8)';
-    if (!edge.is_accessible_fwd && !edge.is_accessible_bwd) return 'rgba(231, 76, 60, 0.8)';
-    return 'rgba(243, 156, 18, 0.9)';
+    const flags = normalizeEdgeFlags(edge);
+
+    if (flags.isBus) return 'rgba(52, 152, 219, 0.9)';
+    if (flags.isElevator) return 'rgba(155, 89, 182, 0.9)';
+    if (flags.isStair) return 'rgba(142, 68, 173, 0.9)';
+    if (flags.isRamp) return 'rgba(230, 126, 34, 0.9)';
+    if (flags.isKeycard) return 'rgba(231, 76, 60, 0.9)';
+    if (flags.isSheltered) return 'rgba(22, 160, 133, 0.9)';
+    return 'rgba(46, 204, 113, 0.8)';
   };
 
   const getNodeColor = (node) => {
@@ -629,15 +684,19 @@ export default function App() {
         </div>
 
         <div style={toolbarPanelStyle}>
-          <strong>3. Default Edge Settings</strong>
-          <label>Tag:
-            <select value={currentEdgeType} onChange={(e) => setCurrentEdgeType(e.target.value)} style={{ marginLeft: '5px' }}>
-              {EDGE_TAGS.map((tag) => (
-                <option key={tag.value} value={tag.value}>{tag.label}</option>
-              ))}
-            </select>
-          </label>
-          <label><input type="checkbox" checked={currentIsAccessible} onChange={(e) => setCurrentIsAccessible(e.target.checked)} /> Default Enabled (2-Way)</label>
+          <strong>3. Edge Defaults</strong>
+          <label><input type="checkbox" checked={createReverseEdge} onChange={(e) => setCreateReverseEdge(e.target.checked)} /> Also create reverse edge</label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(95px, 1fr))', gap: '3px 8px' }}>
+            {EDGE_FLAGS.map(({ key, label }) => (
+              <label key={key}>
+                <input
+                  type="checkbox"
+                  checked={defaultEdgeFlags[key]}
+                  onChange={() => toggleDefaultEdgeFlag(key)}
+                /> {label}
+              </label>
+            ))}
+          </div>
         </div>
 
         {imageUrl && (
@@ -654,14 +713,31 @@ export default function App() {
             <img ref={imgRef} src={imageUrl} alt="Floorplan" onClick={handleCanvasClick} style={{ cursor: mode === 'ADD_NODE' ? 'crosshair' : 'default', display: 'block' }} />
 
             <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+              <defs>
+                <marker id="edge-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+                  <path d="M0,0 L0,6 L9,3 z" fill="currentColor" />
+                </marker>
+              </defs>
               {edges.map((edge) => {
-                const sourceNode = nodes.find(n => n.id === edge.source);
-                const targetNode = nodes.find(n => n.id === edge.target);
+                const sourceTempId = getEdgeSourceTempId(edge);
+                const targetTempId = getEdgeTargetTempId(edge);
+                const sourceNode = nodes.find(n => n.id === sourceTempId);
+                const targetNode = nodes.find(n => n.id === targetTempId);
                 if (!sourceNode || !targetNode) return null;
+                const edgeColor = getEdgeColor(edge);
 
                 return (
                   <g key={edge.id} style={{ pointerEvents: 'stroke' }}>
-                    <line x1={sourceNode.x} y1={sourceNode.y} x2={targetNode.x} y2={targetNode.y} stroke={getEdgeColor(edge)} strokeWidth="4" />
+                    <line
+                      x1={sourceNode.x}
+                      y1={sourceNode.y}
+                      x2={targetNode.x}
+                      y2={targetNode.y}
+                      stroke={edgeColor}
+                      strokeWidth="4"
+                      markerEnd="url(#edge-arrow)"
+                      style={{ color: edgeColor }}
+                    />
                     <line
                       x1={sourceNode.x} y1={sourceNode.y} x2={targetNode.x} y2={targetNode.y}
                       stroke="transparent" strokeWidth="25"
@@ -676,8 +752,10 @@ export default function App() {
             {edges.map((edge) => {
               if (hoveredEdgeId !== edge.id) return null;
 
-              const sourceNode = nodes.find(n => n.id === edge.source);
-              const targetNode = nodes.find(n => n.id === edge.target);
+              const sourceTempId = getEdgeSourceTempId(edge);
+              const targetTempId = getEdgeTargetTempId(edge);
+              const sourceNode = nodes.find(n => n.id === sourceTempId);
+              const targetNode = nodes.find(n => n.id === targetTempId);
               if (!sourceNode || !targetNode) return null;
 
               const midX = (sourceNode.x + targetNode.x) / 2;
@@ -707,14 +785,13 @@ export default function App() {
                     pointerEvents: 'all'
                   }}
                 >
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={edge.is_accessible_fwd} onChange={(e) => toggleEdgeAccess(e, edge.id, 'fwd')} />
-                    Fwd: Node {edge.source} ➔ {edge.target}
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={edge.is_accessible_bwd} onChange={(e) => toggleEdgeAccess(e, edge.id, 'bwd')} />
-                    Bwd: Node {edge.target} ➔ {edge.source}
-                  </label>
+                  <strong>Node {sourceTempId} to {targetTempId}</strong>
+                  {EDGE_FLAGS.map(({ key, label }) => (
+                    <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={Boolean(edge[key])} onChange={(event) => toggleEdgeFlag(event, edge.id, key)} />
+                      {label}
+                    </label>
+                  ))}
                 </div>
               );
             })}
