@@ -4,21 +4,20 @@ import com.fasterxml.jackson.annotation.JsonBackReference;
 
 import jakarta.persistence.Index;
 import jakarta.persistence.Column;
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 @Entity
 @Table(
         name = "instantiated_edges",
         indexes = {
-                @Index(name = "idx_instantiated_edge", columnList = "route_id, edge_order")
+                @Index(name = "idx_instantiated_edge", columnList = "route_id, edge_order"),
+                @Index(name = "idx_instantiated_edge_edge_reference", columnList = "edge_id")
         }
 )
 public class InstantiatedEdge {
