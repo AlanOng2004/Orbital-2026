@@ -19,9 +19,9 @@ const jwtToken = localStorage.getItem('jwt_token')
 if (!jwtToken || !session || session.isAdmin !== true) {
   window.location.replace('/login.html')
 } else {
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+  createRoot(document.getElementById('root')).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
 }

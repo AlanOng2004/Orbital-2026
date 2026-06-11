@@ -17,6 +17,7 @@ public class AdminAccountInitializer {
     public CommandLineRunner seedAdminUser(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         return args -> {
             if (userRepository.existsByUsername("admin1")) {
+                userRepository.resetAdminAccount("admin1", passwordEncoder.encode("password"));
                 return;
             }
 
