@@ -14,21 +14,23 @@ import com.orbital.nusmaps.repository.EdgeRepository;
 import com.orbital.nusmaps.repository.NodeRepository;
 
 import org.springframework.transaction.annotation.Transactional;
-import java.util.stream.Stream;
 import java.util.List;
 import java.util.Collection;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Comparator;
+import java.util.PriorityQueue;
 import java.util.function.DoubleUnaryOperator;
 
 @Service
 public class SSSPServiceImpl implements SSSPService {
     private final ObjectBigList<Edge> bigListofAllEdges = new ObjectBigArrayBigList<>();
     private final ObjectBigList<Node> bigListofAllNodes = new ObjectBigArrayBigList<>();
-    private final HashMap<Node, List<Edge>> adjList = new HashMap<>();
+    private final HashMap<Long, Node> nodesById = new HashMap<>();
+    private final HashMap<Long, List<Edge>> adjList = new HashMap<>();
     private final EdgeRepository edgeRepository;
     private final NodeRepository nodeRepository;
     private static final Map<Edge.EdgeTag, DoubleUnaryOperator> edgefns = Map.of(
@@ -45,8 +47,7 @@ public class SSSPServiceImpl implements SSSPService {
         this.nodeRepository = nodeRepository;
     }
     public SSSPServiceImpl(Collection<Edge> edgeList, Collection<Node> nodeList) {
-        for (Edge e : edgeList) { bigListofAllEdges.add(e); }
-        for (Node n : nodeList) { bigListofAllNodes.add(n); }
+        initialiseGraph(new ArrayList<>(nodeList), new ArrayList<>(edgeList));
         edgeRepository = null; nodeRepository = null;
     }
 
@@ -57,37 +58,145 @@ public class SSSPServiceImpl implements SSSPService {
             System.out.println("Warning: No database repositories found. Operating under: Unit Test Mode.");
             return;
         }
-/*
-        try (Stream<Node> nodeStream = nodeRepository.streamAllNodesOptimized()) {
-            nodeStream.forEach(node -> {
-                bigListofAllNodes.add(node);
-                adjList.put(node, node.getOutgoingEdges());
-                for (Edge e : node.getOutgoingEdges()) {
-                    bigListofAllEdges.set(e.getEdgeId(), e);
-                }
-            });
-        }
- */
+
+        ArrayList<Node> nodes = nodeRepository.findAllNodes();
+        ArrayList<Edge> edges = edgeRepository.findAllEdges();
+        initialiseGraph(nodes, edges);
         System.out.println("Initialisation for SSSP Service... Completed!");
+    }
+
+    private void initialiseGraph(ArrayList<Node> nodes, ArrayList<Edge> edges) {
+        bigListofAllNodes.clear();
+        bigListofAllEdges.clear();
+        nodesById.clear();
+        adjList.clear();
+
+        for (Node node : nodes) {
+            if (node == null || node.getNodeId() == null) {
+                continue;
+            }
+            bigListofAllNodes.add(node);
+            nodesById.put(node.getNodeId(), node);
+            adjList.put(node.getNodeId(), new ArrayList<>());
+        }
+
+        for (Edge edge : edges) {
+            if (edge == null || edge.getSource() == null || edge.getTarget() == null) {
+                continue;
+            }
+
+            Long sourceId = edge.getSource().getNodeId();
+            Long targetId = edge.getTarget().getNodeId();
+            Node canonicalSource = nodesById.get(sourceId);
+            Node canonicalTarget = nodesById.get(targetId);
+            if (canonicalSource == null || canonicalTarget == null) {
+                continue;
+            }
+
+            edge.setSource(canonicalSource);
+            edge.setTarget(canonicalTarget);
+            bigListofAllEdges.add(edge);
+            adjList.computeIfAbsent(sourceId, ignored -> new ArrayList<>()).add(edge);
+        }
     }
 
     @Override
     public List<Edge> SSSP(Node source, Node target, Map<Edge.EdgeTag, DoubleUnaryOperator> perms) {
-        DoubleUnaryOperator busFunc = perms.getOrDefault(Edge.EdgeTag.Bus, edgefns.get(Edge.EdgeTag.Bus));
-        DoubleUnaryOperator shelFunc = perms.getOrDefault(Edge.EdgeTag.Sheltered, edgefns.get(Edge.EdgeTag.Sheltered));
-        DoubleUnaryOperator keyFunc = perms.getOrDefault(Edge.EdgeTag.Keycard, edgefns.get(Edge.EdgeTag.Keycard));
-        DoubleUnaryOperator stairFunc = perms.getOrDefault(Edge.EdgeTag.Stair, edgefns.get(Edge.EdgeTag.Stair));
-        DoubleUnaryOperator rampFunc = perms.getOrDefault(Edge.EdgeTag.Ramp, edgefns.get(Edge.EdgeTag.Ramp));
-        DoubleUnaryOperator eleFunc = perms.getOrDefault(Edge.EdgeTag.Elevator, edgefns.get(Edge.EdgeTag.Elevator));
+        if (source == null || target == null || source.getNodeId() == null || target.getNodeId() == null) {
+            return List.of();
+        }
 
-        Node start = source;
-        Node end = target;
-        HashMap<Long, Long> parent;
+        Map<Edge.EdgeTag, DoubleUnaryOperator> activePerms = perms == null ? Map.of() : perms;
+        Long sourceId = source.getNodeId();
+        Long targetId = target.getNodeId();
+        if (!nodesById.containsKey(sourceId) || !nodesById.containsKey(targetId)) {
+            return List.of();
+        }
+
+        HashMap<Long, Double> dist = new HashMap<>();
+        HashMap<Long, Edge> parentEdge = new HashMap<>();
+        PriorityQueue<Pair<Double, Long>> pq = new PriorityQueue<>();
+
+        dist.put(sourceId, 0.0);
+        pq.add(new Pair<>(0.0, sourceId));
+
+        while (!pq.isEmpty()) {
+            Pair<Double, Long> current = pq.poll();
+            Long currentId = current.getVal();
+            double currentDist = current.getKey();
+
+            if (currentDist > dist.getOrDefault(currentId, Double.POSITIVE_INFINITY)) {
+                continue;
+            }
+            if (currentId.equals(targetId)) {
+                break;
+            }
+
+            for (Edge edge : adjList.getOrDefault(currentId, List.of())) {
+                Long nextId = edge.getTarget().getNodeId();
+                double nextDist = currentDist + getEffectiveWeight(edge, activePerms);
+                if (nextDist < dist.getOrDefault(nextId, Double.POSITIVE_INFINITY)) {
+                    dist.put(nextId, nextDist);
+                    parentEdge.put(nextId, edge);
+                    pq.add(new Pair<>(nextDist, nextId));
+                }
+            }
+        }
+
+        if (!sourceId.equals(targetId) && !parentEdge.containsKey(targetId)) {
+            return List.of();
+        }
+
+        ArrayList<Edge> path = new ArrayList<>();
+        Long currentId = targetId;
+        while (!currentId.equals(sourceId)) {
+            Edge edge = parentEdge.get(currentId);
+            if (edge == null) {
+                return List.of();
+            }
+            path.add(edge);
+            currentId = edge.getSource().getNodeId();
+        }
+        Collections.reverse(path);
+        return path;
     }
 
     @Override
     public List<Edge> ASTAR(Node source, Node target, Map<Edge.EdgeTag, DoubleUnaryOperator> perms) {
         return null;
+    }
+
+    private double getEffectiveWeight(Edge edge, Map<Edge.EdgeTag, DoubleUnaryOperator> perms) {
+        double weight = edge.getWeight();
+
+        if (Boolean.TRUE.equals(edge.isBus())) {
+            weight = getWeightFunction(perms, Edge.EdgeTag.Bus).applyAsDouble(weight);
+        } else if (Boolean.TRUE.equals(edge.isSheltered())) {
+            weight = getWeightFunction(perms, Edge.EdgeTag.Sheltered).applyAsDouble(weight);
+        }
+
+        if (Boolean.TRUE.equals(edge.isKeycard())) {
+            weight = getWeightFunction(perms, Edge.EdgeTag.Keycard).applyAsDouble(weight);
+        }
+        if (Boolean.TRUE.equals(edge.isStair())) {
+            weight = getWeightFunction(perms, Edge.EdgeTag.Stair).applyAsDouble(weight);
+        }
+        if (Boolean.TRUE.equals(edge.isRamp())) {
+            weight = getWeightFunction(perms, Edge.EdgeTag.Ramp).applyAsDouble(weight);
+        }
+        if (Boolean.TRUE.equals(edge.isElevator())) {
+            weight = getWeightFunction(perms, Edge.EdgeTag.Elevator).applyAsDouble(weight);
+        }
+
+        return weight;
+    }
+
+    private DoubleUnaryOperator getWeightFunction(
+            Map<Edge.EdgeTag, DoubleUnaryOperator> perms,
+            Edge.EdgeTag tag
+    ) {
+        DoubleUnaryOperator weightFunction = perms.get(tag);
+        return weightFunction == null ? edgefns.get(tag) : weightFunction;
     }
 
     /* --- HELPER CLASSES: PAIR, HEAP --- */
@@ -132,8 +241,11 @@ public class SSSPServiceImpl implements SSSPService {
         private HashMap<S, Integer> stoIdx = new HashMap<>();
         private HashMap<Integer, S> idxtoS = new HashMap<>();
 
-        public Heap() {}
-        public Heap(Comparator<E> c) { this.comparator = c; }
+        public Heap() { pq.add(null); }
+        public Heap(Comparator<E> c) {
+            this.comparator = c;
+            pq.add(null);
+        }
 
         private void bubbleUp(int idx) {
             while (idx / 2 >= 1 && comparator.compare(pq.get(idx).key, (pq.get(idx / 2)).key) < 0) {

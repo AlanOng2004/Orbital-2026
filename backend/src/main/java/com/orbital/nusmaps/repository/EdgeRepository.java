@@ -1,11 +1,19 @@
-    package com.orbital.nusmaps.repository;
+package com.orbital.nusmaps.repository;
 
-    import org.springframework.data.jpa.repository.Query;
-    import java.util.stream.Stream;
+import org.springframework.data.jpa.repository.Query;
 
-    import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.ArrayList;
+import java.util.List;
 
-    import com.orbital.nusmaps.model.Edge;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
 
-    public interface EdgeRepository extends JpaRepository<Edge, Long> {
-    }
+import com.orbital.nusmaps.model.Edge;
+
+public interface EdgeRepository extends JpaRepository<Edge, Long> {
+    @EntityGraph(attributePaths = {"source", "target"})
+    @Query("select e from Edge e")
+    List<Edge> findAllWithNodes();
+
+    default ArrayList<Edge> findAllEdges() { return new ArrayList<>(findAllWithNodes()); }
+}
