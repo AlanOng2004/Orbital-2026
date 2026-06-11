@@ -1,8 +1,11 @@
-package com.orbital.nusmaps.repository;
+    package com.orbital.nusmaps.repository;
 
-import org.springframework.data.jpa.repository.JpaRepository;
+    import org.springframework.data.jpa.repository.Query;
+    import java.util.stream.Stream;
 
-import com.orbital.nusmaps.model.Edge;
+    import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface EdgeRepository extends JpaRepository<Edge, Long> {
-}
+    import com.orbital.nusmaps.model.Edge;
+
+    public interface EdgeRepository extends JpaRepository<Edge, Long> {
+    }
