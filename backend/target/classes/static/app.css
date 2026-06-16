@@ -200,6 +200,10 @@
   padding: 10px 8px;
   border: 1px solid #263846;
   border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
   font-size: 18px;
   box-sizing: border-box;
 }
@@ -210,9 +214,19 @@
 }
 
 .sideMenu header::after {
-  content: "<account details>";
-  display: block;
-  margin-top: 4px;
+  content: none;
+}
+
+.accountAction {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #1c4d7a;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
 }
 
 .sideMenu section {

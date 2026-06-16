@@ -1,5 +1,6 @@
 package com.orbital.nusmaps.implement;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import it.unimi.dsi.fastutil.objects.ObjectBigArrayBigList;
@@ -42,6 +43,7 @@ public class SSSPServiceImpl implements SSSPService {
             Edge.EdgeTag.Elevator, dist -> (dist + 0.00004) * 3
     );
 
+    @Autowired
     public SSSPServiceImpl(EdgeRepository edgeRepository, NodeRepository nodeRepository) {
         this.edgeRepository = edgeRepository;
         this.nodeRepository = nodeRepository;

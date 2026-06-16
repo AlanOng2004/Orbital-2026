@@ -142,6 +142,28 @@ const SEARCH_ITEMS = [
 const QUICK_ACTIONS = ["🍴 Food", "📖 Empty Rooms", "🚻 Toilets", "🚌 Bus Stop"];
 const ROUTE_OPTIONS = ["Less walking", "Walking only", "Sheltered Paths", "No keycard"];
 
+function getStoredSession() {
+  try {
+    const raw = localStorage.getItem("points_app_session");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function getAccountState() {
+  const session = getStoredSession();
+  const username =
+    typeof session?.username === "string" && session.username.trim()
+      ? session.username.trim()
+      : "guest";
+
+  return {
+    username,
+    isGuest: username === "guest",
+  };
+}
+
 const state = {
   windowSize: { width: window.innerWidth, height: window.innerHeight },
   camera: null,
@@ -416,6 +438,12 @@ function toggleMenu(key) {
   render();
 }
 
+function signOut() {
+  localStorage.removeItem("jwt_token");
+  localStorage.removeItem("points_app_session");
+  render();
+}
+
 function restoreUi() {
   if (state.hideOptions.ui) {
     state.hideOptions.ui = false;
@@ -437,6 +465,7 @@ function render() {
   const results = getResults();
   const activeFloorData =
     COM1_FLOORS.find((floor) => floor.id === state.activeFloor) || COM1_FLOORS[1];
+  const account = getAccountState();
   const visibleUi = !state.hideOptions.ui;
   const bearing = normalizeBearing(visibleCamera.bearing);
   const mapTransform =
@@ -549,7 +578,14 @@ function render() {
             cameraViewport.menuWidth || SIDE_MENU_WIDTH
           }px;height:${cameraViewport.outerHeight}px;"
           >
-            <header><strong>&lt;Account Name&gt;</strong></header>
+            <header>
+              <strong>${escapeHtml(account.username)}</strong>
+              ${
+                account.isGuest
+                  ? `<a class="accountAction" href="/login.html">sign in</a>`
+                  : `<button class="accountAction" type="button" data-account-action="sign-out">sign out</button>`
+              }
+            </header>
             <section class="historyBlock">
               <h2>Recent</h2>
               ${renderMenuDropdown("recentPlaces", "Places", MENU_LISTS.recentPlaces)}
@@ -822,6 +858,10 @@ function bindEvents(root, cameraViewport, visibleCamera) {
     });
   });
 
+  root.querySelectorAll("[data-account-action=\"sign-out\"]").forEach((button) => {
+    button.addEventListener("click", signOut);
+  });
+
   root.querySelectorAll("[data-floor-id]").forEach((button) => {
     button.addEventListener("click", () => {
       state.activeFloor = button.dataset.floorId;
@@ -991,6 +1031,12 @@ window.addEventListener("resize", () => {
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     state.hideOptions.ui = false;
+    render();
+  }
+});
+
+window.addEventListener("storage", (event) => {
+  if (event.key === "jwt_token" || event.key === "points_app_session") {
     render();
   }
 });
