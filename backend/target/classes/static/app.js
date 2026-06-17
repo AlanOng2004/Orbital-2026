@@ -164,72 +164,24 @@ function getAccountState() {
   };
 }
 
-function getSearchMatches(term) {
-  const normalized = normalize(term);
-  if (normalized.length < 1) return [];
-
-  return SEARCH_ITEMS.filter((item) =>
-    [item.label, ...(item.aliases || [])].some((value) => normalize(value).includes(normalized)),
-  ).slice(0, 7);
-}
-
-function resolveSearchItem(term) {
-  const normalized = normalize(term);
-  if (normalized.length < 1) return null;
-
-  const exactMatch = SEARCH_ITEMS.find(
-    (item) =>
-      normalize(item.label) === normalized ||
-      (item.aliases || []).some((alias) => normalize(alias) === normalized),
-  );
-  if (exactMatch) return exactMatch;
-
-  const matches = getSearchMatches(term);
-  return matches[0] || null;
-}
-
-function createRouteOptions(sourceItem, destinationItem) {
-  const seed = sourceItem.label.length + destinationItem.label.length;
-  const baseMinutes = 8 + (seed % 5) + Math.floor(seed / 14);
-  return [
-    {
-      id: "fastest",
-      label: "Fastest path",
-      time: `${baseMinutes} min`,
-      description: "Best for getting there quickly with the shortest walking time.",
-    },
-    {
-      id: "sheltered",
-      label: "Sheltered path",
-      time: `${baseMinutes + 3} min`,
-      description: "A safer placeholder path that prefers covered walkways.",
-    },
-    {
-      id: "accessible",
-      label: "Accessible path",
-      time: `${baseMinutes + 5} min`,
-      description: "A placeholder route that avoids stairs when possible.",
-    },
-  ];
-}
-
 const state = {
   windowSize: { width: window.innerWidth, height: window.innerHeight },
   camera: null,
   isInteracting: false,
   isDialDragging: false,
   query: "",
+  searchCommitted: false,
   activeResult: null,
   mode: "home",
   activeFloor: "L1",
   activeRoom: null,
   sideMenuOpen: false,
   expandedMenus: {},
-  routeSearch: {
-    source: "",
-    destination: "",
+  routePlanner: {
+    stage: "input",
+    src: "",
+    srcConfirmed: false,
   },
-  routePlan: null,
   routeOptions: {
     "Less walking": false,
     "Walking only": false,
@@ -408,8 +360,10 @@ function getVisibleCamera() {
 
 function getResults() {
   const term = normalize(state.query);
-  if (term.length < 2) return [];
-  return getSearchMatches(term);
+  if (state.searchCommitted || term.length < 2) return [];
+  return SEARCH_ITEMS.filter((item) =>
+    [item.label, ...(item.aliases || [])].some((value) => normalize(value).includes(term)),
+  ).slice(0, 7);
 }
 
 function setCamera(nextCamera, elastic = false) {
@@ -423,7 +377,12 @@ function setCameraFromUpdater(updater, elastic = false) {
 function selectResult(item) {
   state.activeResult = item;
   state.query = item.label;
-  state.routePlan = null;
+  state.searchCommitted = true;
+  state.routePlanner = {
+    stage: "input",
+    src: "",
+    srcConfirmed: false,
+  };
 
   if (item.type === "faculty") {
     state.mode = "home";
@@ -452,29 +411,24 @@ function selectResult(item) {
   render();
 }
 
-function submitRouteSearch() {
-  const sourceItem = resolveSearchItem(state.routeSearch.source);
-  const destinationItem = resolveSearchItem(state.routeSearch.destination);
-
-  if (!sourceItem || !destinationItem) {
-    state.sideMenuOpen = true;
-    state.routePlan = null;
-    render();
-    return;
-  }
-
-  state.routePlan = {
-    sourceItem,
-    destinationItem,
-    options: createRouteOptions(sourceItem, destinationItem),
-  };
-  state.sideMenuOpen = true;
+function openRoutePlanner() {
+  if (!state.activeResult) return;
+  state.routePlanner.stage = "input";
   render();
 }
 
-function setRouteField(field, value) {
-  state.routeSearch[field] = value;
-  state.routePlan = null;
+function submitRoutePlanner() {
+  const src = state.routePlanner.src.trim();
+  if (!src || !state.activeResult) return;
+  state.routePlanner.srcConfirmed = true;
+  state.routePlanner.stage = "results";
+  render();
+}
+
+function setRoutePlannerSrc(value) {
+  state.routePlanner.src = value;
+  state.routePlanner.srcConfirmed = false;
+  state.routePlanner.stage = "input";
   render();
 }
 
@@ -532,29 +486,31 @@ function restoreUi() {
 
 function render() {
   const root = document.getElementById("appRoot");
-  const focusedElement = document.activeElement;
+  const activeElement = document.activeElement;
   const priorFocus =
-    focusedElement &&
-    ["searchInput", "routeSourceInput", "routeDestinationInput"].includes(focusedElement.id)
+    activeElement && ["searchInput", "routeSrcInput"].includes(activeElement.id)
       ? {
-          id: focusedElement.id,
-          selectionStart: focusedElement.selectionStart,
-          selectionEnd: focusedElement.selectionEnd,
+          id: activeElement.id,
+          selectionStart: activeElement.selectionStart,
+          selectionEnd: activeElement.selectionEnd,
         }
       : null;
   const cameraViewport = getCameraViewportState();
   const boundsViewport = getBoundsViewport();
   const visibleCamera = getVisibleCamera();
   const results = getResults();
-  const routeSourceResults = getSearchMatches(state.routeSearch.source);
-  const routeDestinationResults = getSearchMatches(state.routeSearch.destination);
+  const routeSrcSuggestions = state.routePlanner.src.trim() && !state.routePlanner.srcConfirmed
+    ? SEARCH_ITEMS.filter((item) =>
+        [item.label, ...(item.aliases || [])].some((value) =>
+          normalize(value).includes(normalize(state.routePlanner.src)),
+        ),
+      ).slice(0, 6)
+    : [];
   const activeFloorData =
     COM1_FLOORS.find((floor) => floor.id === state.activeFloor) || COM1_FLOORS[1];
   const account = getAccountState();
   const visibleUi = !state.hideOptions.ui;
-  const routeSourceItem = state.routePlan?.sourceItem || null;
-  const routeDestinationItem = state.routePlan?.destinationItem || null;
-  const routeOptions = state.routePlan?.options || [];
+  const showRoutePlanner = !!state.activeResult && visibleCamera.zoom >= 0.85;
   const bearing = normalizeBearing(visibleCamera.bearing);
   const mapTransform =
     `translate(${boundsViewport.width / 2}px, ${boundsViewport.height / 2}px) ` +
@@ -600,27 +556,7 @@ function render() {
           style="left:${-MAP.cropX}px;top:${-MAP.cropY}px;width:${MAP.sourceWidth}px;height:${MAP.sourceHeight}px;"
         />
         ${
-          routeSourceItem && routeSourceItem.box
-            ? `<div
-                class="mapHighlight mapHighlight--routeSrc"
-                style="left:${routeSourceItem.box.x}px;top:${routeSourceItem.box.y}px;width:${routeSourceItem.box.width}px;height:${routeSourceItem.box.height}px;"
-              ></div>`
-            : ""
-        }
-        ${
-          routeDestinationItem && routeDestinationItem.box
-            ? `<div
-                class="mapHighlight mapHighlight--routeDst"
-                style="left:${routeDestinationItem.box.x}px;top:${routeDestinationItem.box.y}px;width:${routeDestinationItem.box.width}px;height:${routeDestinationItem.box.height}px;"
-              ></div>`
-            : ""
-        }
-        ${
-          !routeSourceItem &&
-          !routeDestinationItem &&
-          state.activeResult &&
-          state.activeResult.box &&
-          state.mode === "home"
+          state.activeResult && state.activeResult.box && state.mode === "home"
             ? `<div
                 class="mapHighlight mapHighlight--${state.activeResult.type}"
                 style="left:${state.activeResult.box.x}px;top:${state.activeResult.box.y}px;width:${state.activeResult.box.width}px;height:${state.activeResult.box.height}px;"
@@ -649,92 +585,93 @@ function render() {
         ? `<section class="topChrome" style="left:${cameraViewport.x + 28}px;top:${
             cameraViewport.y + 18
           }px;">
-            <div class="topChrome__stack">
-              <div class="searchBlock">
-                <div class="searchShell">
-                  <div class="searchIcon" aria-hidden="true"></div>
-                  <input
-                    id="searchInput"
-                    value="${escapeHtml(state.query)}"
-                    placeholder="Search for: Faculty, Building, Room..."
-                    aria-label="Search for faculty, building, or room"
-                  />
-                </div>
-                ${
-                  results.length > 0
-                    ? `<div class="resultList">
-                        ${results
-                          .map(
-                            (item) => `<button type="button" data-result-id="${item.id}">
-                              <span>${escapeHtml(item.label)}</span>
-                              <small>${item.type}</small>
-                            </button>`,
-                          )
-                          .join("")}
-                      </div>`
-                    : ""
-                }
-              </div>
-              <div class="routePlanner">
-                <div class="routeField">
-                  <span class="routeField__label">src:</span>
-                  <div class="searchShell searchShell--route">
-                    <div class="searchIcon" aria-hidden="true"></div>
-                    <input
-                      id="routeSourceInput"
-                      value="${escapeHtml(state.routeSearch.source)}"
-                      placeholder="Enter source"
-                      aria-label="Source location"
-                    />
-                  </div>
-                  ${
-                    routeSourceResults.length > 0
-                      ? `<div class="routeResultList">
-                          ${routeSourceResults
-                            .map(
-                              (item) => `<button type="button" data-route-pick="source" data-route-item-id="${item.id}">
-                                <span>${escapeHtml(item.label)}</span>
-                                <small>${item.type}</small>
-                              </button>`,
-                            )
-                            .join("")}
-                        </div>`
-                      : ""
-                  }
-                </div>
-                <div class="routeArrow" aria-hidden="true">→</div>
-                <div class="routeField">
-                  <span class="routeField__label">dst:</span>
-                  <div class="searchShell searchShell--route">
-                    <div class="searchIcon" aria-hidden="true"></div>
-                    <input
-                      id="routeDestinationInput"
-                      value="${escapeHtml(state.routeSearch.destination)}"
-                      placeholder="Enter destination"
-                      aria-label="Destination location"
-                    />
-                  </div>
-                  ${
-                    routeDestinationResults.length > 0
-                      ? `<div class="routeResultList routeResultList--destination">
-                          ${routeDestinationResults
-                            .map(
-                              (item) => `<button type="button" data-route-pick="destination" data-route-item-id="${item.id}">
-                                <span>${escapeHtml(item.label)}</span>
-                                <small>${item.type}</small>
-                              </button>`,
-                            )
-                            .join("")}
-                        </div>`
-                      : ""
-                  }
-                </div>
-                <button id="routeGoButton" class="routeGoButton" type="button">GO</button>
-              </div>
-              <div class="quickActions">
-                ${QUICK_ACTIONS.map((label) => `<button type="button">${label}</button>`).join("")}
-              </div>
+            <div class="searchShell">
+              <div class="searchIcon" aria-hidden="true"></div>
+              <input
+                id="searchInput"
+                value="${escapeHtml(state.query)}"
+                placeholder="Search for: Faculty, Building, Room..."
+                aria-label="Search for faculty, building, or room"
+              />
             </div>
+            ${
+              results.length > 0
+                ? `<div class="resultList">
+                    ${results
+                      .map(
+                        (item) => `<button type="button" data-result-id="${item.id}">
+                          <span>${escapeHtml(item.label)}</span>
+                          <small>${item.type}</small>
+                        </button>`,
+                      )
+                      .join("")}
+                  </div>`
+                : ""
+            }
+            <div class="quickActions">
+              ${QUICK_ACTIONS.map((label) => `<button type="button">${label}</button>`).join("")}
+            </div>
+            ${
+              showRoutePlanner
+                ? `<section class="routePlannerPanel">
+                    <div class="routePlannerPanel__title">Plan route</div>
+                    <label class="routePlannerField">
+                      <span>Src:</span>
+                      <input
+                        id="routeSrcInput"
+                        type="text"
+                        value="${escapeHtml(state.routePlanner.src)}"
+                        placeholder="Enter source"
+                        autocomplete="off"
+                      />
+                    </label>
+                    ${
+                      routeSrcSuggestions.length > 0
+                        ? `<div class="routePlannerSuggestions">
+                            ${routeSrcSuggestions
+                              .map(
+                                (item) => `<button type="button" data-route-src-suggestion="${item.id}">
+                                  <span>${escapeHtml(item.label)}</span>
+                                  <small>${item.type}</small>
+                                </button>`,
+                              )
+                              .join("")}
+                          </div>`
+                        : ""
+                    }
+                    <label class="routePlannerField">
+                      <span>Dst:</span>
+                      <input
+                        type="text"
+                        value="${escapeHtml(state.activeResult.label)}"
+                        readonly
+                      />
+                    </label>
+                    <button id="routePlannerGo" type="button" class="routePlannerGo">Go</button>
+                    ${
+                      state.routePlanner.stage === "results"
+                        ? `<div class="routePlannerResults">
+                            <article>
+                              <strong>Fastest route</strong>
+                              <span>12 min</span>
+                              <p>Placeholder route description for now.</p>
+                            </article>
+                            <article>
+                              <strong>Sheltered route</strong>
+                              <span>15 min</span>
+                              <p>Placeholder route description for now.</p>
+                            </article>
+                            <article>
+                              <strong>Accessible route</strong>
+                              <span>18 min</span>
+                              <p>Placeholder route description for now.</p>
+                            </article>
+                          </div>`
+                        : ""
+                    }
+                  </section>`
+                : ""
+            }
           </section>`
         : ""
     }
@@ -746,31 +683,6 @@ function render() {
             cameraViewport.menuWidth || SIDE_MENU_WIDTH
           }px;height:${cameraViewport.outerHeight}px;"
           >
-            ${
-              state.routePlan
-                ? `<section class="routeSummary">
-                    <h2>Route Preview</h2>
-                    <p><strong>From:</strong> ${escapeHtml(state.routePlan.sourceItem.label)}</p>
-                    <p><strong>To:</strong> ${escapeHtml(state.routePlan.destinationItem.label)}</p>
-                    <div class="routeSummaryList">
-                      ${routeOptions
-                        .map(
-                          (option) => `<article class="routeCard">
-                            <div class="routeCard__top">
-                              <strong>${escapeHtml(option.label)}</strong>
-                              <span>${escapeHtml(option.time)}</span>
-                            </div>
-                            <p>${escapeHtml(option.description)}</p>
-                          </article>`,
-                        )
-                        .join("")}
-                    </div>
-                  </section>`
-                : `<section class="routeSummary routeSummary--empty">
-                    <h2>Route Preview</h2>
-                    <p>Enter a source and destination, then press GO.</p>
-                  </section>`
-            }
             <header>
               <strong>${escapeHtml(account.username)}</strong>
               ${
@@ -1003,9 +915,8 @@ function bindEvents(root, cameraViewport, visibleCamera) {
   const floorOverlay = root.querySelector("#floorOverlay");
   const floorSheet = root.querySelector(".floorSheet");
   const searchInput = root.querySelector("#searchInput");
-  const routeSourceInput = root.querySelector("#routeSourceInput");
-  const routeDestinationInput = root.querySelector("#routeDestinationInput");
-  const routeGoButton = root.querySelector("#routeGoButton");
+  const routeSrcInput = root.querySelector("#routeSrcInput");
+  const routePlannerGo = root.querySelector("#routePlannerGo");
   const menuHandle = root.querySelector("#menuHandle");
   const locateButton = root.querySelector("#locateButton");
   const compassButton = root.querySelector("#compassButton");
@@ -1016,38 +927,27 @@ function bindEvents(root, cameraViewport, visibleCamera) {
   if (searchInput) {
     searchInput.addEventListener("input", (event) => {
       state.query = event.target.value;
+      state.searchCommitted = false;
+      state.activeResult = null;
+      state.routePlanner.stage = "input";
+      state.routePlanner.srcConfirmed = false;
       render();
     });
-  }
 
-  if (routeSourceInput) {
-    routeSourceInput.addEventListener("input", (event) => {
-      setRouteField("source", event.target.value);
-    });
-
-    routeSourceInput.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        submitRouteSearch();
+    searchInput.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      const normalized = normalize(state.query);
+      const exact = SEARCH_ITEMS.find((item) =>
+        [item.label, ...(item.aliases || [])].some((value) => normalize(value) === normalized),
+      );
+      if (exact) {
+        selectResult(exact);
+        return;
       }
+      const first = getResults()[0];
+      if (first) selectResult(first);
     });
-  }
-
-  if (routeDestinationInput) {
-    routeDestinationInput.addEventListener("input", (event) => {
-      setRouteField("destination", event.target.value);
-    });
-
-    routeDestinationInput.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        submitRouteSearch();
-      }
-    });
-  }
-
-  if (routeGoButton) {
-    routeGoButton.addEventListener("click", submitRouteSearch);
   }
 
   root.querySelectorAll("[data-result-id]").forEach((button) => {
@@ -1057,15 +957,13 @@ function bindEvents(root, cameraViewport, visibleCamera) {
     });
   });
 
-  root.querySelectorAll("[data-route-pick]").forEach((button) => {
+  root.querySelectorAll("[data-route-src-suggestion]").forEach((button) => {
     button.addEventListener("click", () => {
-      const item = SEARCH_ITEMS.find((entry) => entry.id === button.dataset.routeItemId);
+      const item = SEARCH_ITEMS.find((entry) => entry.id === button.dataset.routeSrcSuggestion);
       if (!item) return;
-      if (button.dataset.routePick === "source") {
-        setRouteField("source", item.label);
-      } else if (button.dataset.routePick === "destination") {
-        setRouteField("destination", item.label);
-      }
+      state.routePlanner.src = item.label;
+      state.routePlanner.srcConfirmed = true;
+      render();
     });
   });
 
@@ -1099,6 +997,25 @@ function bindEvents(root, cameraViewport, visibleCamera) {
   root.querySelectorAll("[data-account-action=\"sign-out\"]").forEach((button) => {
     button.addEventListener("click", signOut);
   });
+
+  if (routeSrcInput) {
+    routeSrcInput.addEventListener("input", (event) => {
+      setRoutePlannerSrc(event.target.value);
+    });
+    routeSrcInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        submitRoutePlanner();
+      }
+    });
+  }
+
+  if (routePlannerGo) {
+    routePlannerGo.addEventListener("click", () => {
+      state.routePlanner.srcConfirmed = true;
+      submitRoutePlanner();
+    });
+  }
 
   root.querySelectorAll("[data-floor-id]").forEach((button) => {
     button.addEventListener("click", () => {
