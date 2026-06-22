@@ -287,6 +287,11 @@ function getSelectedRoute() {
   return state.routePlanner.routes.find((route) => route.routeId === state.routePlanner.selectedRouteId) || null;
 }
 
+function getRouteNodesForFloor(route, floorId) {
+  if (!route || !Array.isArray(route.pathNodes) || !floorId) return [];
+  return route.pathNodes.filter((node) => floorIdFromLevel(node.floorLevel) === floorId);
+}
+
 function openSelectedRouteFloor(route) {
   if (!route || !Array.isArray(route.pathNodes) || route.pathNodes.length === 0) return;
   const firstFloor = floorIdFromLevel(route.pathNodes[0].floorLevel);
@@ -809,7 +814,7 @@ function render() {
   const root = document.getElementById("appRoot");
   const activeElement = document.activeElement;
   const priorFocus =
-    activeElement && ["searchInput", "routeSrcInput"].includes(activeElement.id)
+    activeElement && ["searchInput", "routeSrcInput", "routeDstInput"].includes(activeElement.id)
       ? {
           id: activeElement.id,
           selectionStart: activeElement.selectionStart,
@@ -827,15 +832,15 @@ function render() {
     ? state.routePlanner.dstSuggestions
     : [];
   const selectedRoute = getSelectedRoute();
-  const floorRouteNodes =
-    selectedRoute && state.mode === "map"
-      ? selectedRoute.pathNodes.filter((node) => floorIdFromLevel(node.floorLevel) === state.activeFloor)
-      : [];
+  const floorRouteNodes = state.mode === "map" ? getRouteNodesForFloor(selectedRoute, state.activeFloor) : [];
+  const floorRouteStartNode = floorRouteNodes[0] || null;
+  const floorRouteEndNode = floorRouteNodes[floorRouteNodes.length - 1] || null;
   const activeFloorData =
     COM1_FLOORS.find((floor) => floor.id === state.activeFloor) || COM1_FLOORS[1];
   const account = getAccountState();
   const visibleUi = !state.hideOptions.ui;
   const showRoutePlanner = !!state.activeResult && visibleCamera.zoom >= 0.85;
+  const floorShift = visibleUi && showRoutePlanner && state.windowSize.width > 960 ? 210 : 0;
   const bearing = normalizeBearing(visibleCamera.bearing);
   const mapTransform =
     `translate(${boundsViewport.width / 2}px, ${boundsViewport.height / 2}px) ` +
@@ -1180,7 +1185,7 @@ function render() {
         ? `<section
             id="floorOverlay"
             class="floorOverlay"
-            style="left:${cameraViewport.x}px;top:${cameraViewport.y}px;width:${cameraViewport.width}px;height:${cameraViewport.height}px;"
+            style="left:${cameraViewport.x}px;top:${cameraViewport.y}px;width:${cameraViewport.width}px;height:${cameraViewport.height}px;--floor-shift:${floorShift}px;"
           >
             <div class="floorSheet">
               <div class="floorTitle">Current floor displayed: ${state.activeFloor}</div>
@@ -1224,19 +1229,41 @@ function render() {
                               />`
                             : ""
                         }
-                        <circle
-                          cx="${floorRouteNodes[0].x}"
-                          cy="${floorRouteNodes[0].y}"
-                          r="18"
-                          fill="#0f172a"
-                          stroke="#ffffff"
-                          stroke-width="8"
-                        />
                         ${
-                          floorRouteNodes.length > 1
+                          floorRouteStartNode
                             ? `<circle
-                                cx="${floorRouteNodes[floorRouteNodes.length - 1].x}"
-                                cy="${floorRouteNodes[floorRouteNodes.length - 1].y}"
+                                cx="${floorRouteStartNode.x}"
+                                cy="${floorRouteStartNode.y}"
+                                r="18"
+                                fill="#facc15"
+                                stroke="#ffffff"
+                                stroke-width="8"
+                              />
+                              <g transform="translate(${floorRouteStartNode.x}, ${floorRouteStartNode.y - 44})">
+                                <rect
+                                  x="-82"
+                                  y="-22"
+                                  width="164"
+                                  height="28"
+                                  rx="8"
+                                  fill="rgba(15, 23, 42, 0.92)"
+                                />
+                                <text
+                                  x="0"
+                                  y="-4"
+                                  text-anchor="middle"
+                                  fill="#ffffff"
+                                  font-size="14"
+                                  font-weight="700"
+                                >${escapeHtml(floorRouteStartNode.label || "Start")}</text>
+                              </g>`
+                            : ""
+                        }
+                        ${
+                          floorRouteEndNode && floorRouteEndNode !== floorRouteStartNode
+                            ? `<circle
+                                cx="${floorRouteEndNode.x}"
+                                cy="${floorRouteEndNode.y}"
                                 r="18"
                                 fill="#1277d4"
                                 stroke="#ffffff"

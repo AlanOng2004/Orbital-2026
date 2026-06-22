@@ -747,6 +747,7 @@
   justify-content: center;
   padding: 84px 84px 34px 34px;
   background: rgba(16, 20, 24, 0.42);
+  box-sizing: border-box;
 }
 
 .floorSheet {
@@ -756,6 +757,7 @@
   justify-content: center;
   width: min(1120px, calc(100% - 90px));
   max-height: calc(100% - 96px);
+  transform: translateX(var(--floor-shift, 0px));
 }
 
 .floorTitle {
@@ -775,9 +777,11 @@
 
 .floorViewport {
   position: relative;
+  display: inline-block;
   overflow: hidden;
   background: #ffffff;
   box-shadow: 0 24px 70px rgba(16, 24, 32, 0.34);
+  line-height: 0;
 }
 
 .floorViewport img {
@@ -827,6 +831,12 @@
 .floorStack button.isActive {
   background: #1477d4;
   color: #ffffff;
+}
+
+@media (min-width: 961px) {
+  .floorViewport img {
+    width: min(1040px, calc(100vw - 360px));
+  }
 }
 
 @media (max-width: 720px) {
