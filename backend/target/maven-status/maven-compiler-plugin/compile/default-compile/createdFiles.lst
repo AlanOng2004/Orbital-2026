@@ -3,6 +3,7 @@ com/orbital/nusmaps/config/DotEnvEnvironmentPostProcessor.class
 com/orbital/nusmaps/model/Node$NodeType.class
 com/orbital/nusmaps/model/Edge$EdgeTag.class
 com/orbital/nusmaps/repository/UserRepository.class
+com/orbital/nusmaps/dto/SameBuildingRouteResponse$RoutePathNodeResponse.class
 com/orbital/nusmaps/service/SSSPService.class
 com/orbital/nusmaps/repository/NodeRepository.class
 com/orbital/nusmaps/Backend.class
@@ -14,6 +15,8 @@ com/orbital/nusmaps/dto/AuthResponse.class
 com/orbital/nusmaps/model/Floorplan.class
 com/orbital/nusmaps/dto/AnnotatorImportRequest$AnnotatorNodeImport.class
 com/orbital/nusmaps/model/User$Gender.class
+com/orbital/nusmaps/dto/SameBuildingRouteResponse.class
+com/orbital/nusmaps/dto/SameBuildingRouteResponse$RouteOptionResponse.class
 com/orbital/nusmaps/implement/LoginServiceImpl.class
 com/orbital/nusmaps/config/PasswordConfig.class
 com/orbital/nusmaps/dto/LoginRequest.class
@@ -21,14 +24,17 @@ com/orbital/nusmaps/implement/RegisterServiceImpl.class
 com/orbital/nusmaps/model/Faculty.class
 com/orbital/nusmaps/model/User.class
 com/orbital/nusmaps/model/InstantiatedEdge.class
+com/orbital/nusmaps/controller/RouteController.class
 com/orbital/nusmaps/model/SavedRoute.class
 com/orbital/nusmaps/dto/ErrorResponse.class
 com/orbital/nusmaps/repository/EdgeRepository.class
 com/orbital/nusmaps/config/SecurityConfig.class
+com/orbital/nusmaps/dto/RouteNodeOptionResponse.class
 com/orbital/nusmaps/dto/AnnotatorImportRequest.class
 com/orbital/nusmaps/model/SavedPlace.class
 com/orbital/nusmaps/model/FacultyAlias.class
 com/orbital/nusmaps/config/JwtAuthenticationFilter.class
+com/orbital/nusmaps/dto/SameBuildingRouteRequest.class
 com/orbital/nusmaps/model/Edge.class
 com/orbital/nusmaps/dto/AnnotatorImportRequest$AnnotatorEdgeImport.class
 com/orbital/nusmaps/model/BuildingAlias.class
