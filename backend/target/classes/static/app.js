@@ -227,9 +227,20 @@ function uniqueBy(items, keyFn) {
   });
 }
 
-function floorIdFromLevel(level) {
-  if (level === 0) return "B1";
-  return `L${level}`;
+function floorIdFromData(level, imageUrl = "") {
+  const normalizedImageUrl = String(imageUrl || "").toUpperCase();
+  if (normalizedImageUrl.includes("_B1")) return "B1";
+  if (normalizedImageUrl.includes("_01")) return "L1";
+  if (normalizedImageUrl.includes("_02")) return "L2";
+  if (normalizedImageUrl.includes("_03")) return "L3";
+
+  const numericLevel = Number(level);
+  if (Number.isFinite(numericLevel)) {
+    if (numericLevel <= 0) return "B1";
+    return `L${numericLevel}`;
+  }
+
+  return "L1";
 }
 
 function getDisplayLabel(item) {
@@ -276,7 +287,7 @@ function getRouteDescription(route) {
   }
   const floors = uniqueBy(
     route.pathNodes
-      .map((node) => floorIdFromLevel(node.floorLevel))
+      .map((node) => floorIdFromData(node.floorLevel, node.floorImageUrl))
       .filter(Boolean),
     (value) => value,
   );
@@ -289,14 +300,16 @@ function getSelectedRoute() {
 
 function getRouteNodesForFloor(route, floorId) {
   if (!route || !Array.isArray(route.pathNodes) || !floorId) return [];
-  return route.pathNodes.filter((node) => floorIdFromLevel(node.floorLevel) === floorId);
+  return route.pathNodes.filter(
+    (node) => floorIdFromData(node.floorLevel, node.floorImageUrl) === floorId,
+  );
 }
 
 function getRouteFloorSequence(route) {
   if (!route || !Array.isArray(route.pathNodes)) return [];
   return uniqueBy(
     route.pathNodes
-      .map((node) => floorIdFromLevel(node.floorLevel))
+      .map((node) => floorIdFromData(node.floorLevel, node.floorImageUrl))
       .filter(Boolean),
     (value) => value,
   );
@@ -330,7 +343,7 @@ function isTransitionNode(node, route, activeFloor) {
 
 function openSelectedRouteFloor(route) {
   if (!route || !Array.isArray(route.pathNodes) || route.pathNodes.length === 0) return;
-  const firstFloor = floorIdFromLevel(route.pathNodes[0].floorLevel);
+  const firstFloor = floorIdFromData(route.pathNodes[0].floorLevel, route.pathNodes[0].floorImageUrl);
   if (firstFloor) {
     state.activeFloor = firstFloor;
   }
@@ -359,7 +372,7 @@ function toDynamicSearchItem(node) {
       (value) => normalize(String(value)),
     ),
     buildingId: buildingItem?.id || null,
-    floor: floorIdFromLevel(node.floorLevel),
+    floor: floorIdFromData(node.floorLevel, node.floorImageUrl),
     roomBox: null,
     nodePoint: Number.isFinite(node.x) && Number.isFinite(node.y) ? { x: node.x, y: node.y } : null,
     routeNodeId: node.nodeId,
@@ -1252,7 +1265,6 @@ function render() {
             style="left:${cameraViewport.x}px;top:${cameraViewport.y}px;width:${cameraViewport.width}px;height:${cameraViewport.height}px;--floor-shift:${floorShift}px;"
           >
             <div class="floorSheet">
-              <div class="floorTitle">Current floor displayed: ${state.activeFloor}</div>
               <div class="floorViewport">
                 <img src="${activeFloorData.img}" draggable="false" alt="" />
                 ${
@@ -1356,7 +1368,7 @@ function render() {
                                   cx="${floorRouteEndNode.x}"
                                   cy="${floorRouteEndNode.y}"
                                   r="18"
-                                  fill="#1277d4"
+                                  fill="#22c55e"
                                   stroke="#ffffff"
                                   stroke-width="8"
                                 />`
