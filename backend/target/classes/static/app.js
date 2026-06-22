@@ -142,18 +142,46 @@ const SEARCH_ITEMS = [
 const QUICK_ACTIONS = ["🍴 Food", "📖 Empty Rooms", "🚻 Toilets", "🚌 Bus Stop"];
 const ROUTE_OPTIONS = ["Less walking", "Walking only", "Sheltered Paths", "No keycard"];
 
+function getStoredSession() {
+  try {
+    const raw = localStorage.getItem("points_app_session");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function getAccountState() {
+  const session = getStoredSession();
+  const username =
+    typeof session?.username === "string" && session.username.trim()
+      ? session.username.trim()
+      : "guest";
+
+  return {
+    username,
+    isGuest: username === "guest",
+  };
+}
+
 const state = {
   windowSize: { width: window.innerWidth, height: window.innerHeight },
   camera: null,
   isInteracting: false,
   isDialDragging: false,
   query: "",
+  searchCommitted: false,
   activeResult: null,
   mode: "home",
   activeFloor: "L1",
   activeRoom: null,
   sideMenuOpen: false,
   expandedMenus: {},
+  routePlanner: {
+    stage: "input",
+    src: "",
+    srcConfirmed: false,
+  },
   routeOptions: {
     "Less walking": false,
     "Walking only": false,
@@ -332,7 +360,7 @@ function getVisibleCamera() {
 
 function getResults() {
   const term = normalize(state.query);
-  if (term.length < 2) return [];
+  if (state.searchCommitted || term.length < 2) return [];
   return SEARCH_ITEMS.filter((item) =>
     [item.label, ...(item.aliases || [])].some((value) => normalize(value).includes(term)),
   ).slice(0, 7);
@@ -349,6 +377,12 @@ function setCameraFromUpdater(updater, elastic = false) {
 function selectResult(item) {
   state.activeResult = item;
   state.query = item.label;
+  state.searchCommitted = true;
+  state.routePlanner = {
+    stage: "input",
+    src: "",
+    srcConfirmed: false,
+  };
 
   if (item.type === "faculty") {
     state.mode = "home";
@@ -374,6 +408,27 @@ function selectResult(item) {
   if (building && building.box) {
     setCamera(cameraForBox(building.box, getBoundsViewport(), 0, 180));
   }
+  render();
+}
+
+function openRoutePlanner() {
+  if (!state.activeResult) return;
+  state.routePlanner.stage = "input";
+  render();
+}
+
+function submitRoutePlanner() {
+  const src = state.routePlanner.src.trim();
+  if (!src || !state.activeResult) return;
+  state.routePlanner.srcConfirmed = true;
+  state.routePlanner.stage = "results";
+  render();
+}
+
+function setRoutePlannerSrc(value) {
+  state.routePlanner.src = value;
+  state.routePlanner.srcConfirmed = false;
+  state.routePlanner.stage = "input";
   render();
 }
 
@@ -416,6 +471,12 @@ function toggleMenu(key) {
   render();
 }
 
+function signOut() {
+  localStorage.removeItem("jwt_token");
+  localStorage.removeItem("points_app_session");
+  render();
+}
+
 function restoreUi() {
   if (state.hideOptions.ui) {
     state.hideOptions.ui = false;
@@ -425,19 +486,31 @@ function restoreUi() {
 
 function render() {
   const root = document.getElementById("appRoot");
-  const priorSearch = document.activeElement && document.activeElement.id === "searchInput"
-    ? {
-        selectionStart: document.activeElement.selectionStart,
-        selectionEnd: document.activeElement.selectionEnd,
-      }
-    : null;
+  const activeElement = document.activeElement;
+  const priorFocus =
+    activeElement && ["searchInput", "routeSrcInput"].includes(activeElement.id)
+      ? {
+          id: activeElement.id,
+          selectionStart: activeElement.selectionStart,
+          selectionEnd: activeElement.selectionEnd,
+        }
+      : null;
   const cameraViewport = getCameraViewportState();
   const boundsViewport = getBoundsViewport();
   const visibleCamera = getVisibleCamera();
   const results = getResults();
+  const routeSrcSuggestions = state.routePlanner.src.trim() && !state.routePlanner.srcConfirmed
+    ? SEARCH_ITEMS.filter((item) =>
+        [item.label, ...(item.aliases || [])].some((value) =>
+          normalize(value).includes(normalize(state.routePlanner.src)),
+        ),
+      ).slice(0, 6)
+    : [];
   const activeFloorData =
     COM1_FLOORS.find((floor) => floor.id === state.activeFloor) || COM1_FLOORS[1];
+  const account = getAccountState();
   const visibleUi = !state.hideOptions.ui;
+  const showRoutePlanner = !!state.activeResult && visibleCamera.zoom >= 0.85;
   const bearing = normalizeBearing(visibleCamera.bearing);
   const mapTransform =
     `translate(${boundsViewport.width / 2}px, ${boundsViewport.height / 2}px) ` +
@@ -538,6 +611,67 @@ function render() {
             <div class="quickActions">
               ${QUICK_ACTIONS.map((label) => `<button type="button">${label}</button>`).join("")}
             </div>
+            ${
+              showRoutePlanner
+                ? `<section class="routePlannerPanel">
+                    <div class="routePlannerPanel__title">Plan route</div>
+                    <label class="routePlannerField">
+                      <span>Src:</span>
+                      <input
+                        id="routeSrcInput"
+                        type="text"
+                        value="${escapeHtml(state.routePlanner.src)}"
+                        placeholder="Enter source"
+                        autocomplete="off"
+                      />
+                    </label>
+                    ${
+                      routeSrcSuggestions.length > 0
+                        ? `<div class="routePlannerSuggestions">
+                            ${routeSrcSuggestions
+                              .map(
+                                (item) => `<button type="button" data-route-src-suggestion="${item.id}">
+                                  <span>${escapeHtml(item.label)}</span>
+                                  <small>${item.type}</small>
+                                </button>`,
+                              )
+                              .join("")}
+                          </div>`
+                        : ""
+                    }
+                    <label class="routePlannerField">
+                      <span>Dst:</span>
+                      <input
+                        type="text"
+                        value="${escapeHtml(state.activeResult.label)}"
+                        readonly
+                      />
+                    </label>
+                    <button id="routePlannerGo" type="button" class="routePlannerGo">Go</button>
+                    ${
+                      state.routePlanner.stage === "results"
+                        ? `<div class="routePlannerResults">
+                            <article>
+                              <strong>Fastest route</strong>
+                              <span>12 min</span>
+                              <p>Placeholder route description for now.</p>
+                            </article>
+                            <article>
+                              <strong>Sheltered route</strong>
+                              <span>15 min</span>
+                              <p>Placeholder route description for now.</p>
+                            </article>
+                            <article>
+                              <strong>Accessible route</strong>
+                              <span>18 min</span>
+                              <p>Placeholder route description for now.</p>
+                            </article>
+                          </div>`
+                        : ""
+                    }
+                  </section>`
+                : ""
+            }
           </section>`
         : ""
     }
@@ -549,7 +683,14 @@ function render() {
             cameraViewport.menuWidth || SIDE_MENU_WIDTH
           }px;height:${cameraViewport.outerHeight}px;"
           >
-            <header><strong>&lt;Account Name&gt;</strong></header>
+            <header>
+              <strong>${escapeHtml(account.username)}</strong>
+              ${
+                account.isGuest
+                  ? `<a class="accountAction" href="/login.html">sign in</a>`
+                  : `<button class="accountAction" type="button" data-account-action="sign-out">sign out</button>`
+              }
+            </header>
             <section class="historyBlock">
               <h2>Recent</h2>
               ${renderMenuDropdown("recentPlaces", "Places", MENU_LISTS.recentPlaces)}
@@ -730,11 +871,11 @@ function render() {
 
   bindEvents(root, cameraViewport, visibleCamera);
 
-  if (priorSearch) {
-    const nextSearch = root.querySelector("#searchInput");
-    if (nextSearch) {
-      nextSearch.focus();
-      nextSearch.setSelectionRange(priorSearch.selectionStart, priorSearch.selectionEnd);
+  if (priorFocus) {
+    const nextFocus = root.querySelector(`#${priorFocus.id}`);
+    if (nextFocus) {
+      nextFocus.focus();
+      nextFocus.setSelectionRange(priorFocus.selectionStart, priorFocus.selectionEnd);
     }
   }
 }
@@ -774,6 +915,8 @@ function bindEvents(root, cameraViewport, visibleCamera) {
   const floorOverlay = root.querySelector("#floorOverlay");
   const floorSheet = root.querySelector(".floorSheet");
   const searchInput = root.querySelector("#searchInput");
+  const routeSrcInput = root.querySelector("#routeSrcInput");
+  const routePlannerGo = root.querySelector("#routePlannerGo");
   const menuHandle = root.querySelector("#menuHandle");
   const locateButton = root.querySelector("#locateButton");
   const compassButton = root.querySelector("#compassButton");
@@ -784,7 +927,26 @@ function bindEvents(root, cameraViewport, visibleCamera) {
   if (searchInput) {
     searchInput.addEventListener("input", (event) => {
       state.query = event.target.value;
+      state.searchCommitted = false;
+      state.activeResult = null;
+      state.routePlanner.stage = "input";
+      state.routePlanner.srcConfirmed = false;
       render();
+    });
+
+    searchInput.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      const normalized = normalize(state.query);
+      const exact = SEARCH_ITEMS.find((item) =>
+        [item.label, ...(item.aliases || [])].some((value) => normalize(value) === normalized),
+      );
+      if (exact) {
+        selectResult(exact);
+        return;
+      }
+      const first = getResults()[0];
+      if (first) selectResult(first);
     });
   }
 
@@ -792,6 +954,16 @@ function bindEvents(root, cameraViewport, visibleCamera) {
     button.addEventListener("click", () => {
       const item = SEARCH_ITEMS.find((entry) => entry.id === button.dataset.resultId);
       if (item) selectResult(item);
+    });
+  });
+
+  root.querySelectorAll("[data-route-src-suggestion]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const item = SEARCH_ITEMS.find((entry) => entry.id === button.dataset.routeSrcSuggestion);
+      if (!item) return;
+      state.routePlanner.src = item.label;
+      state.routePlanner.srcConfirmed = true;
+      render();
     });
   });
 
@@ -821,6 +993,29 @@ function bindEvents(root, cameraViewport, visibleCamera) {
       state.routeOptions[checkbox.dataset.routeOption] = checkbox.checked;
     });
   });
+
+  root.querySelectorAll("[data-account-action=\"sign-out\"]").forEach((button) => {
+    button.addEventListener("click", signOut);
+  });
+
+  if (routeSrcInput) {
+    routeSrcInput.addEventListener("input", (event) => {
+      setRoutePlannerSrc(event.target.value);
+    });
+    routeSrcInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        submitRoutePlanner();
+      }
+    });
+  }
+
+  if (routePlannerGo) {
+    routePlannerGo.addEventListener("click", () => {
+      state.routePlanner.srcConfirmed = true;
+      submitRoutePlanner();
+    });
+  }
 
   root.querySelectorAll("[data-floor-id]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -991,6 +1186,12 @@ window.addEventListener("resize", () => {
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     state.hideOptions.ui = false;
+    render();
+  }
+});
+
+window.addEventListener("storage", (event) => {
+  if (event.key === "jwt_token" || event.key === "points_app_session") {
     render();
   }
 });
