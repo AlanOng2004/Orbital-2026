@@ -185,6 +185,16 @@ const state = {
     srcConfirmed: false,
     srcSuggestions: [],
     srcRequestId: 0,
+    srcSelection: null,
+    dst: "",
+    dstConfirmed: false,
+    dstSuggestions: [],
+    dstRequestId: 0,
+    dstSelection: null,
+    routes: [],
+    selectedRouteId: null,
+    loading: false,
+    error: "",
   },
   routeOptions: {
     "Less walking": false,
@@ -247,6 +257,45 @@ function findBuildingItemForName(buildingName) {
   );
 }
 
+function getBuildingQueryForItem(item) {
+  if (!item) return null;
+  if (item.type === "building") return item.label;
+  if (item.buildingId) {
+    return SEARCH_ITEMS.find((entry) => entry.id === item.buildingId)?.label || null;
+  }
+  return null;
+}
+
+function getRouteNodeId(item) {
+  return item && Number.isFinite(Number(item.routeNodeId)) ? Number(item.routeNodeId) : null;
+}
+
+function getRouteDescription(route) {
+  if (!route || !Array.isArray(route.pathNodes) || route.pathNodes.length === 0) {
+    return "No path available.";
+  }
+  const floors = uniqueBy(
+    route.pathNodes
+      .map((node) => floorIdFromLevel(node.floorLevel))
+      .filter(Boolean),
+    (value) => value,
+  );
+  return `${route.pathNodes.length} nodes across ${floors.join(" / ")}`;
+}
+
+function getSelectedRoute() {
+  return state.routePlanner.routes.find((route) => route.routeId === state.routePlanner.selectedRouteId) || null;
+}
+
+function openSelectedRouteFloor(route) {
+  if (!route || !Array.isArray(route.pathNodes) || route.pathNodes.length === 0) return;
+  const firstFloor = floorIdFromLevel(route.pathNodes[0].floorLevel);
+  if (firstFloor) {
+    state.activeFloor = firstFloor;
+  }
+  state.mode = "map";
+}
+
 function toDynamicSearchItem(node) {
   const buildingItem = findBuildingItemForName(node.buildingName);
   const displayLabel = node.dualLabel || node.label;
@@ -271,6 +320,7 @@ function toDynamicSearchItem(node) {
     buildingId: buildingItem?.id || null,
     floor: floorIdFromLevel(node.floorLevel),
     roomBox: null,
+    nodePoint: Number.isFinite(node.x) && Number.isFinite(node.y) ? { x: node.x, y: node.y } : null,
     routeNodeId: node.nodeId,
   };
 }
@@ -377,6 +427,36 @@ function refreshRouteSrcSuggestions() {
     .catch(() => {
       if (requestId !== state.routePlanner.srcRequestId) return;
       state.routePlanner.srcSuggestions = staticMatches.slice(0, 6);
+      render();
+    });
+}
+
+function refreshRouteDstSuggestions() {
+  const raw = state.routePlanner.dst.trim();
+  const term = normalize(raw);
+  if (!raw || state.routePlanner.dstConfirmed) {
+    state.routePlanner.dstSuggestions = [];
+    render();
+    return;
+  }
+
+  const buildingQuery = getBuildingQueryForItem(state.activeResult);
+  const staticMatches = SEARCH_ITEMS.filter((item) =>
+    getSearchTerms(item).some((value) => normalize(value).includes(term)),
+  );
+  const requestId = ++state.routePlanner.dstRequestId;
+  state.routePlanner.dstSuggestions = staticMatches.slice(0, 6);
+  render();
+
+  fetchRouteNodeSearch(raw, buildingQuery)
+    .then((dynamicItems) => {
+      if (requestId !== state.routePlanner.dstRequestId) return;
+      state.routePlanner.dstSuggestions = mergeSearchResults(staticMatches, dynamicItems, term, 6);
+      render();
+    })
+    .catch(() => {
+      if (requestId !== state.routePlanner.dstRequestId) return;
+      state.routePlanner.dstSuggestions = staticMatches.slice(0, 6);
       render();
     });
 }
@@ -551,7 +631,8 @@ function setCameraFromUpdater(updater, elastic = false) {
 }
 
 function selectResult(item) {
-  state.activeResult = item;
+  const buildingItem = item.type === "room" ? SEARCH_ITEMS.find((entry) => entry.id === item.buildingId) : item;
+  state.activeResult = buildingItem || item;
   state.query = getDisplayLabel(item);
   state.searchResults = [];
   state.searchCommitted = true;
@@ -561,6 +642,16 @@ function selectResult(item) {
     srcConfirmed: false,
     srcSuggestions: [],
     srcRequestId: 0,
+    srcSelection: null,
+    dst: getDisplayLabel(item),
+    dstConfirmed: true,
+    dstSuggestions: [],
+    dstRequestId: 0,
+    dstSelection: item,
+    routes: [],
+    selectedRouteId: null,
+    loading: false,
+    error: "",
   };
 
   if (item.type === "faculty") {
@@ -580,7 +671,7 @@ function selectResult(item) {
     return;
   }
 
-  state.mode = "map";
+  state.mode = "home";
   state.activeFloor = item.floor || "L1";
   state.activeRoom = item;
   const building = SEARCH_ITEMS.find((candidate) => candidate.id === item.buildingId);
@@ -597,18 +688,69 @@ function openRoutePlanner() {
 }
 
 function submitRoutePlanner() {
-  const src = state.routePlanner.src.trim();
-  if (!src || !state.activeResult) return;
-  state.routePlanner.srcConfirmed = true;
-  state.routePlanner.stage = "results";
+  const sourceNodeId = getRouteNodeId(state.routePlanner.srcSelection);
+  const targetNodeId = getRouteNodeId(state.routePlanner.dstSelection);
+  if (!sourceNodeId || !targetNodeId) {
+    state.routePlanner.error = "Select both source and destination from the suggestions.";
+    render();
+    return;
+  }
+
+  state.routePlanner.loading = true;
+  state.routePlanner.error = "";
   render();
+
+  fetch("/api/routes/same-building", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sourceNodeId, targetNodeId }),
+  })
+    .then((response) =>
+      response.json().catch(() => ({})).then((payload) => ({ ok: response.ok, payload })),
+    )
+    .then(({ ok, payload }) => {
+      if (!ok) {
+        throw new Error(payload?.error || payload?.message || "Unable to compute route.");
+      }
+
+      state.routePlanner.routes = Array.isArray(payload.routes) ? payload.routes : [];
+      state.routePlanner.selectedRouteId = state.routePlanner.routes[0]?.routeId || null;
+      state.routePlanner.stage = "results";
+      state.routePlanner.loading = false;
+      if (state.routePlanner.routes[0]) {
+        openSelectedRouteFloor(state.routePlanner.routes[0]);
+      }
+      render();
+    })
+    .catch((error) => {
+      state.routePlanner.loading = false;
+      state.routePlanner.error = error.message || "Unable to compute route.";
+      state.routePlanner.routes = [];
+      state.routePlanner.selectedRouteId = null;
+      render();
+    });
 }
 
 function setRoutePlannerSrc(value) {
   state.routePlanner.src = value;
   state.routePlanner.srcConfirmed = false;
+  state.routePlanner.srcSelection = null;
   state.routePlanner.stage = "input";
+  state.routePlanner.routes = [];
+  state.routePlanner.selectedRouteId = null;
+  state.routePlanner.error = "";
   refreshRouteSrcSuggestions();
+}
+
+function setRoutePlannerDst(value) {
+  state.routePlanner.dst = value;
+  state.routePlanner.dstConfirmed = false;
+  state.routePlanner.dstSelection = null;
+  state.routePlanner.stage = "input";
+  state.routePlanner.routes = [];
+  state.routePlanner.selectedRouteId = null;
+  state.routePlanner.error = "";
+  refreshRouteDstSuggestions();
 }
 
 function angleFromDial(event, dialRef) {
@@ -681,6 +823,14 @@ function render() {
   const routeSrcSuggestions = state.routePlanner.src.trim() && !state.routePlanner.srcConfirmed
     ? state.routePlanner.srcSuggestions
     : [];
+  const routeDstSuggestions = state.routePlanner.dst.trim() && !state.routePlanner.dstConfirmed
+    ? state.routePlanner.dstSuggestions
+    : [];
+  const selectedRoute = getSelectedRoute();
+  const floorRouteNodes =
+    selectedRoute && state.mode === "map"
+      ? selectedRoute.pathNodes.filter((node) => floorIdFromLevel(node.floorLevel) === state.activeFloor)
+      : [];
   const activeFloorData =
     COM1_FLOORS.find((floor) => floor.id === state.activeFloor) || COM1_FLOORS[1];
   const account = getAccountState();
@@ -817,30 +967,56 @@ function render() {
                     <label class="routePlannerField">
                       <span>Dst:</span>
                       <input
+                        id="routeDstInput"
                         type="text"
-                        value="${escapeHtml(state.activeResult.label)}"
-                        readonly
+                        value="${escapeHtml(state.routePlanner.dst)}"
+                        placeholder="Enter destination"
+                        autocomplete="off"
                       />
                     </label>
+                    ${
+                      routeDstSuggestions.length > 0
+                        ? `<div class="routePlannerSuggestions">
+                            ${routeDstSuggestions
+                              .map(
+                                (item) => `<button type="button" data-route-dst-suggestion="${item.id}">
+                                  <span>${escapeHtml(getDisplayLabel(item))}</span>
+                                  <small>${escapeHtml(item.secondaryLabel || item.type)}</small>
+                                </button>`,
+                              )
+                              .join("")}
+                          </div>`
+                        : ""
+                    }
                     <button id="routePlannerGo" type="button" class="routePlannerGo">Go</button>
+                    ${
+                      state.routePlanner.error
+                        ? `<div class="routePlannerError">${escapeHtml(state.routePlanner.error)}</div>`
+                        : ""
+                    }
+                    ${
+                      state.routePlanner.loading
+                        ? `<div class="routePlannerLoading">Finding routes...</div>`
+                        : ""
+                    }
                     ${
                       state.routePlanner.stage === "results"
                         ? `<div class="routePlannerResults">
-                            <article>
-                              <strong>Fastest route</strong>
-                              <span>12 min</span>
-                              <p>Placeholder route description for now.</p>
-                            </article>
-                            <article>
-                              <strong>Sheltered route</strong>
-                              <span>15 min</span>
-                              <p>Placeholder route description for now.</p>
-                            </article>
-                            <article>
-                              <strong>Accessible route</strong>
-                              <span>18 min</span>
-                              <p>Placeholder route description for now.</p>
-                            </article>
+                            ${state.routePlanner.routes
+                              .map(
+                                (route) => `<button
+                                  type="button"
+                                  class="routePlannerResultCard ${
+                                    route.routeId === state.routePlanner.selectedRouteId ? "isActive" : ""
+                                  }"
+                                  data-route-id="${escapeHtml(route.routeId)}"
+                                >
+                                  <strong>${escapeHtml(route.label)}</strong>
+                                  <span>${escapeHtml(String(route.estimatedTimeMinutes))} min</span>
+                                  <p>${escapeHtml(getRouteDescription(route))}</p>
+                                </button>`,
+                              )
+                              .join("")}
                           </div>`
                         : ""
                     }
@@ -1012,16 +1188,63 @@ function render() {
                 <img src="${activeFloorData.img}" draggable="false" alt="" />
                 ${
                   state.activeRoom &&
-                  state.activeRoom.roomBox &&
                   state.activeRoom.floor === state.activeFloor
-                    ? `<div
-                        class="roomHighlight"
-                        style="left:${(state.activeRoom.roomBox.x / activeFloorData.width) * 100}%;top:${
-                        (state.activeRoom.roomBox.y / activeFloorData.height) * 100
-                      }%;width:${(state.activeRoom.roomBox.width / activeFloorData.width) * 100}%;height:${
-                        (state.activeRoom.roomBox.height / activeFloorData.height) * 100
-                      }%;"
-                      ></div>`
+                    ? state.activeRoom.roomBox
+                      ? `<div
+                          class="roomHighlight"
+                          style="left:${(state.activeRoom.roomBox.x / activeFloorData.width) * 100}%;top:${
+                          (state.activeRoom.roomBox.y / activeFloorData.height) * 100
+                        }%;width:${(state.activeRoom.roomBox.width / activeFloorData.width) * 100}%;height:${
+                          (state.activeRoom.roomBox.height / activeFloorData.height) * 100
+                        }%;"
+                        ></div>`
+                      : state.activeRoom.nodePoint
+                        ? `<div
+                            class="roomHighlight"
+                            style="left:calc(${(state.activeRoom.nodePoint.x / activeFloorData.width) * 100}% - 16px);top:calc(${
+                            (state.activeRoom.nodePoint.y / activeFloorData.height) * 100
+                          }% - 16px);width:32px;height:32px;border-radius:999px;"
+                          ></div>`
+                        : ""
+                    : ""
+                }
+                ${
+                  floorRouteNodes.length > 0
+                    ? `<svg class="floorRouteOverlay" viewBox="0 0 ${activeFloorData.width} ${activeFloorData.height}" preserveAspectRatio="none">
+                        ${
+                          floorRouteNodes.length > 1
+                            ? `<polyline
+                                points="${floorRouteNodes.map((node) => `${node.x},${node.y}`).join(" ")}"
+                                fill="none"
+                                stroke="#1277d4"
+                                stroke-width="18"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                opacity="0.95"
+                              />`
+                            : ""
+                        }
+                        <circle
+                          cx="${floorRouteNodes[0].x}"
+                          cy="${floorRouteNodes[0].y}"
+                          r="18"
+                          fill="#0f172a"
+                          stroke="#ffffff"
+                          stroke-width="8"
+                        />
+                        ${
+                          floorRouteNodes.length > 1
+                            ? `<circle
+                                cx="${floorRouteNodes[floorRouteNodes.length - 1].x}"
+                                cy="${floorRouteNodes[floorRouteNodes.length - 1].y}"
+                                r="18"
+                                fill="#1277d4"
+                                stroke="#ffffff"
+                                stroke-width="8"
+                              />`
+                            : ""
+                        }
+                      </svg>`
                     : ""
                 }
               </div>
@@ -1091,6 +1314,7 @@ function bindEvents(root, cameraViewport, visibleCamera) {
   const floorSheet = root.querySelector(".floorSheet");
   const searchInput = root.querySelector("#searchInput");
   const routeSrcInput = root.querySelector("#routeSrcInput");
+  const routeDstInput = root.querySelector("#routeDstInput");
   const routePlannerGo = root.querySelector("#routePlannerGo");
   const menuHandle = root.querySelector("#menuHandle");
   const locateButton = root.querySelector("#locateButton");
@@ -1140,7 +1364,30 @@ function bindEvents(root, cameraViewport, visibleCamera) {
       if (!item) return;
       state.routePlanner.src = getDisplayLabel(item);
       state.routePlanner.srcConfirmed = true;
+      state.routePlanner.srcSelection = item;
       state.routePlanner.srcSuggestions = [];
+      render();
+    });
+  });
+
+  root.querySelectorAll("[data-route-dst-suggestion]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const item = state.routePlanner.dstSuggestions.find(
+        (entry) => entry.id === button.dataset.routeDstSuggestion,
+      );
+      if (!item) return;
+      state.routePlanner.dst = getDisplayLabel(item);
+      state.routePlanner.dstConfirmed = true;
+      state.routePlanner.dstSelection = item;
+      state.routePlanner.dstSuggestions = [];
+      render();
+    });
+  });
+
+  root.querySelectorAll("[data-route-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.routePlanner.selectedRouteId = button.dataset.routeId;
+      openSelectedRouteFloor(getSelectedRoute());
       render();
     });
   });
@@ -1183,6 +1430,20 @@ function bindEvents(root, cameraViewport, visibleCamera) {
     routeSrcInput.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         event.preventDefault();
+        state.routePlanner.srcConfirmed = true;
+        submitRoutePlanner();
+      }
+    });
+  }
+
+  if (routeDstInput) {
+    routeDstInput.addEventListener("input", (event) => {
+      setRoutePlannerDst(event.target.value);
+    });
+    routeDstInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        state.routePlanner.dstConfirmed = true;
         submitRoutePlanner();
       }
     });
