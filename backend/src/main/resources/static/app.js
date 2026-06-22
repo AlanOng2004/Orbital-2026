@@ -292,6 +292,24 @@ function getRouteNodesForFloor(route, floorId) {
   return route.pathNodes.filter((node) => floorIdFromLevel(node.floorLevel) === floorId);
 }
 
+function getRouteFloorSequence(route) {
+  if (!route || !Array.isArray(route.pathNodes)) return [];
+  return uniqueBy(
+    route.pathNodes
+      .map((node) => floorIdFromLevel(node.floorLevel))
+      .filter(Boolean),
+    (value) => value,
+  );
+}
+
+function getNextRouteFloor(route, activeFloor) {
+  const floors = getRouteFloorSequence(route);
+  if (floors.length === 0) return null;
+  const currentIndex = floors.indexOf(activeFloor);
+  if (currentIndex === -1) return floors[0];
+  return floors[(currentIndex + 1) % floors.length];
+}
+
 function openSelectedRouteFloor(route) {
   if (!route || !Array.isArray(route.pathNodes) || route.pathNodes.length === 0) return;
   const firstFloor = floorIdFromLevel(route.pathNodes[0].floorLevel);
@@ -832,6 +850,7 @@ function render() {
     ? state.routePlanner.dstSuggestions
     : [];
   const selectedRoute = getSelectedRoute();
+  const routeFloorSequence = getRouteFloorSequence(selectedRoute);
   const floorRouteNodes = state.mode === "map" ? getRouteNodesForFloor(selectedRoute, state.activeFloor) : [];
   const floorRouteStartNode = floorRouteNodes[0] || null;
   const floorRouteEndNode = floorRouteNodes[floorRouteNodes.length - 1] || null;
@@ -1191,6 +1210,24 @@ function render() {
               <div class="floorTitle">Current floor displayed: ${state.activeFloor}</div>
               <div class="floorViewport">
                 <img src="${activeFloorData.img}" draggable="false" alt="" />
+                <div class="floorStack" aria-label="Floor selector">
+                  ${(routeFloorSequence.length > 0
+                    ? routeFloorSequence
+                        .slice()
+                        .reverse()
+                        .map((floorId) => COM1_FLOORS.find((floor) => floor.id === floorId))
+                        .filter(Boolean)
+                    : COM1_FLOORS.slice().reverse())
+                    .map(
+                      (floor) =>
+                        `<button
+                          type="button"
+                          data-floor-id="${floor.id}"
+                          class="${floor.id === state.activeFloor ? "isActive" : ""}"
+                        >${floor.id}</button>`,
+                    )
+                    .join("")}
+                </div>
                 ${
                   state.activeRoom &&
                   state.activeRoom.floor === state.activeFloor
@@ -1274,19 +1311,6 @@ function render() {
                       </svg>`
                     : ""
                 }
-              </div>
-              <div class="floorStack" aria-label="Floor selector">
-                ${COM1_FLOORS.slice()
-                  .reverse()
-                  .map(
-                    (floor) =>
-                      `<button
-                        type="button"
-                        data-floor-id="${floor.id}"
-                        class="${floor.id === state.activeFloor ? "isActive" : ""}"
-                      >${floor.id}</button>`,
-                  )
-                  .join("")}
               </div>
             </div>
           </section>`
@@ -1485,7 +1509,13 @@ function bindEvents(root, cameraViewport, visibleCamera) {
 
   root.querySelectorAll("[data-floor-id]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.activeFloor = button.dataset.floorId;
+      const requestedFloor = button.dataset.floorId;
+      const selectedRoute = getSelectedRoute();
+      if (selectedRoute && requestedFloor === state.activeFloor) {
+        state.activeFloor = getNextRouteFloor(selectedRoute, state.activeFloor) || requestedFloor;
+      } else {
+        state.activeFloor = requestedFloor;
+      }
       render();
     });
   });

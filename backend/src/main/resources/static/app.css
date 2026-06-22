@@ -757,6 +757,7 @@
   justify-content: center;
   width: min(1120px, calc(100% - 90px));
   max-height: calc(100% - 96px);
+  box-sizing: border-box;
   transform: translateX(var(--floor-shift, 0px));
 }
 
@@ -810,18 +811,23 @@
 }
 
 .floorStack {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  z-index: 4;
   display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin-left: 10px;
+  flex-direction: row;
+  gap: 8px;
+  margin-left: 0;
 }
 
 .floorStack button {
-  width: 32px;
-  height: 32px;
+  min-width: 44px;
+  height: 38px;
+  padding: 0 10px;
   border: 1px solid rgba(17, 24, 39, 0.12);
-  border-radius: 50%;
-  background: #ffffff;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
   color: #172535;
   font-weight: 800;
   box-shadow: 0 10px 24px rgba(23, 37, 52, 0.2);
@@ -867,6 +873,13 @@
 
   .floorOverlay {
     padding: 96px 18px 20px;
+  }
+
+  .floorStack {
+    left: 10px;
+    top: 10px;
+    gap: 6px;
+    flex-wrap: wrap;
   }
 
   .floorSheet {
