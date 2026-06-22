@@ -256,6 +256,20 @@
   background: #0f67ba;
 }
 
+.routePlannerError {
+  margin-top: 10px;
+  color: #b42318;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.routePlannerLoading {
+  margin-top: 10px;
+  color: #4b5f70;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .routePlannerResults {
   display: flex;
   flex-direction: column;
@@ -263,11 +277,25 @@
   margin-top: 16px;
 }
 
-.routePlannerResults article {
+.routePlannerResults article,
+.routePlannerResultCard {
+  display: block;
+  width: 100%;
   padding: 10px 10px 9px;
   border: 1px solid rgba(17, 24, 39, 0.1);
   border-radius: 12px;
   background: #ffffff;
+  box-sizing: border-box;
+}
+
+.routePlannerResultCard {
+  cursor: pointer;
+  text-align: left;
+}
+
+.routePlannerResultCard.isActive {
+  border-color: rgba(20, 119, 212, 0.42);
+  box-shadow: 0 10px 24px rgba(20, 119, 212, 0.16);
 }
 
 .routePlannerResults strong {
@@ -289,6 +317,43 @@
   color: #5a6b7b;
   font-size: 12px;
   line-height: 1.35;
+}
+
+.routePlannerFloors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.routePlannerFloors button {
+  min-width: 44px;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #172535;
+  font-weight: 800;
+  box-shadow: 0 10px 24px rgba(23, 37, 52, 0.2);
+  cursor: pointer;
+}
+
+.routePlannerFloors button.isActive {
+  background: #1477d4;
+  color: #ffffff;
+}
+
+.routePlannerFloors button.isOnRoute {
+  border-color: rgba(20, 119, 212, 0.28);
+  box-shadow: 0 8px 20px rgba(20, 119, 212, 0.12);
+}
+
+.routePlannerFloors button.isUpcoming {
+  background: #facc15;
+  color: #172535;
+  border-color: rgba(180, 132, 0, 0.35);
+  box-shadow: 0 10px 24px rgba(250, 204, 21, 0.3);
 }
 
 .quickActions button {
@@ -719,6 +784,7 @@
   justify-content: center;
   padding: 84px 84px 34px 34px;
   background: rgba(16, 20, 24, 0.42);
+  box-sizing: border-box;
 }
 
 .floorSheet {
@@ -728,6 +794,9 @@
   justify-content: center;
   width: min(1120px, calc(100% - 90px));
   max-height: calc(100% - 96px);
+  padding-top: 48px;
+  box-sizing: border-box;
+  transform: translateX(var(--floor-shift, 0px));
 }
 
 .floorTitle {
@@ -747,9 +816,11 @@
 
 .floorViewport {
   position: relative;
+  display: inline-block;
   overflow: hidden;
   background: #ffffff;
   box-shadow: 0 24px 70px rgba(16, 24, 32, 0.34);
+  line-height: 0;
 }
 
 .floorViewport img {
@@ -769,28 +840,18 @@
   pointer-events: none;
 }
 
-.floorStack {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin-left: 10px;
+.floorRouteOverlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
-.floorStack button {
-  width: 32px;
-  height: 32px;
-  border: 1px solid rgba(17, 24, 39, 0.12);
-  border-radius: 50%;
-  background: #ffffff;
-  color: #172535;
-  font-weight: 800;
-  box-shadow: 0 10px 24px rgba(23, 37, 52, 0.2);
-  cursor: pointer;
-}
-
-.floorStack button.isActive {
-  background: #1477d4;
-  color: #ffffff;
+@media (min-width: 961px) {
+  .floorViewport img {
+    width: min(1040px, calc(100vw - 360px));
+  }
 }
 
 @media (max-width: 720px) {
@@ -821,6 +882,10 @@
 
   .floorOverlay {
     padding: 96px 18px 20px;
+  }
+
+  .routePlannerFloors {
+    gap: 6px;
   }
 
   .floorSheet {

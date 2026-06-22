@@ -35,12 +35,12 @@ public class SSSPServiceImpl implements SSSPService {
     private final EdgeRepository edgeRepository;
     private final NodeRepository nodeRepository;
     private static final Map<Edge.EdgeTag, DoubleUnaryOperator> edgefns = Map.of(
-            Edge.EdgeTag.Bus, dist -> (dist / 4) + 0.001,
-            Edge.EdgeTag.Sheltered, dist -> dist,
-            Edge.EdgeTag.Keycard, dist -> dist,
-            Edge.EdgeTag.Stair, dist -> (dist + 0.00004) * 3,
-            Edge.EdgeTag.Ramp, dist -> (dist + 0.00004) * 3,
-            Edge.EdgeTag.Elevator, dist -> (dist + 0.00004) * 3
+            Edge.EdgeTag.Bus, dist -> Math.max(0.1, dist * 0.35),
+            Edge.EdgeTag.Sheltered, dist -> dist * 0.98,
+            Edge.EdgeTag.Keycard, dist -> dist * 1.05,
+            Edge.EdgeTag.Stair, dist -> dist * 1.15,
+            Edge.EdgeTag.Ramp, dist -> dist * 1.2,
+            Edge.EdgeTag.Elevator, dist -> dist * 1.25
     );
 
     @Autowired

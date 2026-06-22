@@ -38,6 +38,7 @@ public class SecurityConfig {
                     "/img/**",
                     "/h2-console/**",
                     "/api/auth/**",
+                    "/api/routes/**",
                     "/error"
                 ).permitAll()
                 .anyRequest().authenticated()
