@@ -74,11 +74,14 @@ export default function App() {
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
   const [currentHeight, setCurrentHeight] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchNodeResults, setSearchNodeResults] = useState([]);
   const [buildingNodes, setBuildingNodes] = useState([]);
   const [nodesLoading, setNodesLoading] = useState(false);
   const [nodesError, setNodesError] = useState("");
   const [srcQuery, setSrcQuery] = useState("");
+  const [srcNodeResults, setSrcNodeResults] = useState([]);
   const [dstQuery, setDstQuery] = useState("");
+  const [dstNodeResults, setDstNodeResults] = useState([]);
   const [srcNode, setSrcNode] = useState(null);
   const [dstNode, setDstNode] = useState(null);
   const [routeOptions, setRouteOptions] = useState([]);
@@ -163,6 +166,102 @@ export default function App() {
     };
   }, [activeBuilding, activeBuildingConfig]);
 
+  useEffect(() => {
+    const term = searchQuery.trim();
+    if (term.length < 2) {
+      setSearchNodeResults([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const buildingQuery = activeBuildingConfig?.apiBuildingQuery || activeBuilding;
+
+    async function loadSearchNodes() {
+      try {
+        const response = await fetch(
+          `/api/routes/nodes/search?query=${encodeURIComponent(term)}&buildingQuery=${encodeURIComponent(buildingQuery)}`,
+          { signal: controller.signal },
+        );
+        const payload = await response.json().catch(() => []);
+        if (!response.ok) {
+          throw new Error("Unable to search nodes.");
+        }
+        setSearchNodeResults(Array.isArray(payload) ? payload : []);
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          setSearchNodeResults([]);
+        }
+      }
+    }
+
+    loadSearchNodes();
+    return () => controller.abort();
+  }, [activeBuilding, activeBuildingConfig, searchQuery]);
+
+  useEffect(() => {
+    const term = srcQuery.trim();
+    if (term.length < 1 || srcNode) {
+      setSrcNodeResults([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const buildingQuery = activeBuildingConfig?.apiBuildingQuery || activeBuilding;
+
+    async function loadSourceSuggestions() {
+      try {
+        const response = await fetch(
+          `/api/routes/nodes/search?query=${encodeURIComponent(term)}&buildingQuery=${encodeURIComponent(buildingQuery)}`,
+          { signal: controller.signal },
+        );
+        const payload = await response.json().catch(() => []);
+        if (!response.ok) {
+          throw new Error("Unable to search source nodes.");
+        }
+        setSrcNodeResults(Array.isArray(payload) ? payload : []);
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          setSrcNodeResults([]);
+        }
+      }
+    }
+
+    loadSourceSuggestions();
+    return () => controller.abort();
+  }, [activeBuilding, activeBuildingConfig, srcNode, srcQuery]);
+
+  useEffect(() => {
+    const term = dstQuery.trim();
+    if (term.length < 1 || dstNode) {
+      setDstNodeResults([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const buildingQuery = activeBuildingConfig?.apiBuildingQuery || activeBuilding;
+
+    async function loadDestinationSuggestions() {
+      try {
+        const response = await fetch(
+          `/api/routes/nodes/search?query=${encodeURIComponent(term)}&buildingQuery=${encodeURIComponent(buildingQuery)}`,
+          { signal: controller.signal },
+        );
+        const payload = await response.json().catch(() => []);
+        if (!response.ok) {
+          throw new Error("Unable to search destination nodes.");
+        }
+        setDstNodeResults(Array.isArray(payload) ? payload : []);
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          setDstNodeResults([]);
+        }
+      }
+    }
+
+    loadDestinationSuggestions();
+    return () => controller.abort();
+  }, [activeBuilding, activeBuildingConfig, dstNode, dstQuery]);
+
   const handleMouseMove = (event) => {
     if (!isDragging) {
       return;
@@ -195,7 +294,7 @@ export default function App() {
         secondaryLabel: building.apiBuildingQuery || key,
       }));
 
-    const nodeMatches = buildingNodes
+    const nodeMatches = searchNodeResults
       .filter((option) =>
         getNodeSearchTerms(option).some((value) =>
           normalize(value).includes(term),
@@ -212,7 +311,7 @@ export default function App() {
       }));
 
     return [...buildingMatches, ...nodeMatches];
-  }, [buildingNodes, searchQuery]);
+  }, [searchNodeResults, searchQuery]);
 
   const srcSuggestions = useMemo(() => {
     const term = normalize(srcQuery);
@@ -220,7 +319,7 @@ export default function App() {
       return [];
     }
 
-    return buildingNodes
+    return srcNodeResults
       .filter((option) => {
         if (dstNode && option.nodeId === dstNode.nodeId) {
           return false;
@@ -232,7 +331,7 @@ export default function App() {
       })
       .sort((a, b) => compareNodeSuggestions(a, b, term))
       .slice(0, 6);
-  }, [buildingNodes, dstNode, srcQuery]);
+  }, [dstNode, srcNodeResults, srcQuery]);
 
   const dstSuggestions = useMemo(() => {
     const term = normalize(dstQuery);
@@ -240,7 +339,7 @@ export default function App() {
       return [];
     }
 
-    return buildingNodes
+    return dstNodeResults
       .filter((option) => {
         if (srcNode && option.nodeId === srcNode.nodeId) {
           return false;
@@ -252,7 +351,7 @@ export default function App() {
       })
       .sort((a, b) => compareNodeSuggestions(a, b, term))
       .slice(0, 6);
-  }, [buildingNodes, dstQuery, srcNode]);
+  }, [dstNodeResults, dstQuery, srcNode]);
 
   const activeRoute = routeOptions.find((route) => route.routeId === activeRouteId) || routeOptions[0] || null;
   const currentFloor = activeBuildingConfig?.floors.find((floor) => floor.height === currentHeight) || null;

@@ -22,8 +22,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
@@ -43,6 +43,28 @@ public class RouteController {
     public List<RouteNodeOptionResponse> getBuildingNodes(@PathVariable String buildingQuery) {
         return nodeRepository.findAllByBuildingQuery(buildingQuery).stream()
                 .filter(this::isSearchableNode)
+                .map(this::toRouteNodeOption)
+                .toList();
+    }
+
+    @GetMapping("/nodes/search")
+    public List<RouteNodeOptionResponse> searchRouteNodes(
+            @RequestParam String query,
+            @RequestParam(required = false) String buildingQuery
+    ) {
+        String trimmedQuery = query == null ? "" : query.trim();
+        if (trimmedQuery.length() < 2) {
+            return List.of();
+        }
+
+        String trimmedBuildingQuery = buildingQuery == null || buildingQuery.isBlank()
+                ? null
+                : buildingQuery.trim();
+
+        return nodeRepository.searchRouteNodes(trimmedQuery, trimmedBuildingQuery).stream()
+                .filter(this::isSearchableNode)
+                .sorted((left, right) -> compareSearchPriority(left, right, trimmedQuery))
+                .limit(12)
                 .map(this::toRouteNodeOption)
                 .toList();
     }
@@ -156,6 +178,7 @@ public class RouteController {
                 node.getNodeId(),
                 node.getNodeName(),
                 node.getDualName(),
+                node.getFloorplan().getBuilding().getBuildingName(),
                 formatSecondaryLabel(node),
                 node.getNodeType().name(),
                 node.getFloorplan().getLevel(),
@@ -182,6 +205,49 @@ public class RouteController {
                 && node.getYCoordinate() != null
                 && node.getNodeType() != Node.NodeType.Corridor
                 && node.getNodeType() != Node.NodeType.Junction;
+    }
+
+    private int compareSearchPriority(Node left, Node right, String query) {
+        String normalizedQuery = query.toLowerCase();
+        int leftScore = getSearchScore(left, normalizedQuery);
+        int rightScore = getSearchScore(right, normalizedQuery);
+        if (leftScore != rightScore) {
+            return Integer.compare(leftScore, rightScore);
+        }
+
+        boolean leftIsRoom = left.getNodeType() == Node.NodeType.Room;
+        boolean rightIsRoom = right.getNodeType() == Node.NodeType.Room;
+        if (leftIsRoom != rightIsRoom) {
+            return leftIsRoom ? -1 : 1;
+        }
+
+        return left.getNodeName().compareToIgnoreCase(right.getNodeName());
+    }
+
+    private int getSearchScore(Node node, String normalizedQuery) {
+        List<String> candidates = new ArrayList<>();
+        candidates.add(node.getNodeName());
+        candidates.add(node.getDualName());
+        for (NodeAlias alias : node.getAliases()) {
+            candidates.add(alias.getNodeAlias());
+        }
+
+        int bestScore = 3;
+        for (String candidate : candidates) {
+            if (candidate == null || candidate.isBlank()) {
+                continue;
+            }
+
+            String normalizedCandidate = candidate.toLowerCase();
+            if (normalizedCandidate.equals(normalizedQuery)) {
+                bestScore = Math.min(bestScore, 0);
+            } else if (normalizedCandidate.startsWith(normalizedQuery)) {
+                bestScore = Math.min(bestScore, 1);
+            } else if (normalizedCandidate.contains(normalizedQuery)) {
+                bestScore = Math.min(bestScore, 2);
+            }
+        }
+        return bestScore;
     }
 
     private String formatSecondaryLabel(Node node) {
