@@ -310,6 +310,24 @@ function getNextRouteFloor(route, activeFloor) {
   return floors[(currentIndex + 1) % floors.length];
 }
 
+function getUpcomingRouteFloor(route, activeFloor) {
+  const floors = getRouteFloorSequence(route);
+  if (floors.length < 2) return null;
+  const currentIndex = floors.indexOf(activeFloor);
+  if (currentIndex === -1) return floors[0];
+  if (currentIndex >= floors.length - 1) return null;
+  return floors[currentIndex + 1];
+}
+
+function isTransitionNode(node, route, activeFloor) {
+  if (!node || !route) return false;
+  const floors = getRouteFloorSequence(route);
+  if (floors.length < 2) return false;
+  const currentIndex = floors.indexOf(activeFloor);
+  if (currentIndex === -1 || currentIndex >= floors.length - 1) return false;
+  return node === getRouteNodesForFloor(route, activeFloor).at(-1);
+}
+
 function openSelectedRouteFloor(route) {
   if (!route || !Array.isArray(route.pathNodes) || route.pathNodes.length === 0) return;
   const firstFloor = floorIdFromLevel(route.pathNodes[0].floorLevel);
@@ -854,6 +872,8 @@ function render() {
   const floorRouteNodes = state.mode === "map" ? getRouteNodesForFloor(selectedRoute, state.activeFloor) : [];
   const floorRouteStartNode = floorRouteNodes[0] || null;
   const floorRouteEndNode = floorRouteNodes[floorRouteNodes.length - 1] || null;
+  const upcomingRouteFloor = getUpcomingRouteFloor(selectedRoute, state.activeFloor);
+  const transitionNodeIsStair = isTransitionNode(floorRouteEndNode, selectedRoute, state.activeFloor);
   const activeFloorData =
     COM1_FLOORS.find((floor) => floor.id === state.activeFloor) || COM1_FLOORS[1];
   const account = getAccountState();
@@ -1044,6 +1064,31 @@ function render() {
                           </div>`
                         : ""
                     }
+                    ${
+                      state.mode === "map"
+                        ? `<div class="routePlannerFloors" aria-label="Floor selector">
+                            ${COM1_FLOORS.slice()
+                              .reverse()
+                              .map(
+                                (floor) =>
+                                  `<button
+                                    type="button"
+                                    data-floor-id="${floor.id}"
+                                    class="${
+                                      floor.id === state.activeFloor
+                                        ? "isActive"
+                                        : floor.id === upcomingRouteFloor
+                                          ? "isUpcoming"
+                                          : routeFloorSequence.includes(floor.id)
+                                            ? "isOnRoute"
+                                            : ""
+                                    }"
+                                  >${floor.id}</button>`,
+                              )
+                              .join("")}
+                          </div>`
+                        : ""
+                    }
                   </section>`
                 : ""
             }
@@ -1210,24 +1255,6 @@ function render() {
               <div class="floorTitle">Current floor displayed: ${state.activeFloor}</div>
               <div class="floorViewport">
                 <img src="${activeFloorData.img}" draggable="false" alt="" />
-                <div class="floorStack" aria-label="Floor selector">
-                  ${(routeFloorSequence.length > 0
-                    ? routeFloorSequence
-                        .slice()
-                        .reverse()
-                        .map((floorId) => COM1_FLOORS.find((floor) => floor.id === floorId))
-                        .filter(Boolean)
-                    : COM1_FLOORS.slice().reverse())
-                    .map(
-                      (floor) =>
-                        `<button
-                          type="button"
-                          data-floor-id="${floor.id}"
-                          class="${floor.id === state.activeFloor ? "isActive" : ""}"
-                        >${floor.id}</button>`,
-                    )
-                    .join("")}
-                </div>
                 ${
                   state.activeRoom &&
                   state.activeRoom.floor === state.activeFloor
@@ -1298,14 +1325,41 @@ function render() {
                         }
                         ${
                           floorRouteEndNode && floorRouteEndNode !== floorRouteStartNode
-                            ? `<circle
-                                cx="${floorRouteEndNode.x}"
-                                cy="${floorRouteEndNode.y}"
-                                r="18"
-                                fill="#1277d4"
-                                stroke="#ffffff"
-                                stroke-width="8"
-                              />`
+                            ? transitionNodeIsStair
+                              ? `<circle
+                                  cx="${floorRouteEndNode.x}"
+                                  cy="${floorRouteEndNode.y}"
+                                  r="18"
+                                  fill="#facc15"
+                                  stroke="#ffffff"
+                                  stroke-width="8"
+                                />
+                                <g transform="translate(${floorRouteEndNode.x}, ${floorRouteEndNode.y - 44})">
+                                  <rect
+                                    x="-86"
+                                    y="-22"
+                                    width="172"
+                                    height="28"
+                                    rx="8"
+                                    fill="rgba(15, 23, 42, 0.92)"
+                                  />
+                                  <text
+                                    x="0"
+                                    y="-4"
+                                    text-anchor="middle"
+                                    fill="#ffffff"
+                                    font-size="14"
+                                    font-weight="700"
+                                  >${escapeHtml(`Go to ${upcomingRouteFloor}`)}</text>
+                                </g>`
+                              : `<circle
+                                  cx="${floorRouteEndNode.x}"
+                                  cy="${floorRouteEndNode.y}"
+                                  r="18"
+                                  fill="#1277d4"
+                                  stroke="#ffffff"
+                                  stroke-width="8"
+                                />`
                             : ""
                         }
                       </svg>`

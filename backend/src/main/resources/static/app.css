@@ -319,6 +319,43 @@
   line-height: 1.35;
 }
 
+.routePlannerFloors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.routePlannerFloors button {
+  min-width: 44px;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #172535;
+  font-weight: 800;
+  box-shadow: 0 10px 24px rgba(23, 37, 52, 0.2);
+  cursor: pointer;
+}
+
+.routePlannerFloors button.isActive {
+  background: #1477d4;
+  color: #ffffff;
+}
+
+.routePlannerFloors button.isOnRoute {
+  border-color: rgba(20, 119, 212, 0.28);
+  box-shadow: 0 8px 20px rgba(20, 119, 212, 0.12);
+}
+
+.routePlannerFloors button.isUpcoming {
+  background: #facc15;
+  color: #172535;
+  border-color: rgba(180, 132, 0, 0.35);
+  box-shadow: 0 10px 24px rgba(250, 204, 21, 0.3);
+}
+
 .quickActions button {
   min-width: 92px;
   min-height: 28px;
@@ -757,6 +794,7 @@
   justify-content: center;
   width: min(1120px, calc(100% - 90px));
   max-height: calc(100% - 96px);
+  padding-top: 48px;
   box-sizing: border-box;
   transform: translateX(var(--floor-shift, 0px));
 }
@@ -810,35 +848,6 @@
   pointer-events: none;
 }
 
-.floorStack {
-  position: absolute;
-  left: 14px;
-  top: 14px;
-  z-index: 4;
-  display: flex;
-  flex-direction: row;
-  gap: 8px;
-  margin-left: 0;
-}
-
-.floorStack button {
-  min-width: 44px;
-  height: 38px;
-  padding: 0 10px;
-  border: 1px solid rgba(17, 24, 39, 0.12);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.96);
-  color: #172535;
-  font-weight: 800;
-  box-shadow: 0 10px 24px rgba(23, 37, 52, 0.2);
-  cursor: pointer;
-}
-
-.floorStack button.isActive {
-  background: #1477d4;
-  color: #ffffff;
-}
-
 @media (min-width: 961px) {
   .floorViewport img {
     width: min(1040px, calc(100vw - 360px));
@@ -875,11 +884,8 @@
     padding: 96px 18px 20px;
   }
 
-  .floorStack {
-    left: 10px;
-    top: 10px;
+  .routePlannerFloors {
     gap: 6px;
-    flex-wrap: wrap;
   }
 
   .floorSheet {
