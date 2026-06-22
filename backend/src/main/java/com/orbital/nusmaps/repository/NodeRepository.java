@@ -45,6 +45,8 @@ public interface NodeRepository extends JpaRepository<Node, Long> {
                 lower(n.nodeName) like lower(concat('%', :query, '%'))
              or lower(coalesce(n.dualName, '')) like lower(concat('%', :query, '%'))
              or lower(coalesce(na.nodeAlias, '')) like lower(concat('%', :query, '%'))
+             or lower(b.buildingName) like lower(concat('%', :query, '%'))
+             or lower(coalesce(ba.buildingAlias, '')) like lower(concat('%', :query, '%'))
             )
           and (
                 :buildingQuery is null

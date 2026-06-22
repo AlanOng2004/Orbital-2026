@@ -6,6 +6,7 @@ public record RouteNodeOptionResponse(
         Long nodeId,
         String label,
         String dualLabel,
+        String buildingName,
         String secondaryLabel,
         String nodeType,
         Integer floorLevel,

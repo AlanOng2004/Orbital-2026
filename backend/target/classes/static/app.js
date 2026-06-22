@@ -170,6 +170,8 @@ const state = {
   isInteracting: false,
   isDialDragging: false,
   query: "",
+  searchResults: [],
+  searchRequestId: 0,
   searchCommitted: false,
   activeResult: null,
   mode: "home",
@@ -181,6 +183,8 @@ const state = {
     stage: "input",
     src: "",
     srcConfirmed: false,
+    srcSuggestions: [],
+    srcRequestId: 0,
   },
   routeOptions: {
     "Less walking": false,
@@ -201,6 +205,180 @@ const state = {
 
 function normalize(value) {
   return value.trim().toLowerCase();
+}
+
+function uniqueBy(items, keyFn) {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = keyFn(item);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function floorIdFromLevel(level) {
+  if (level === 0) return "B1";
+  return `L${level}`;
+}
+
+function getDisplayLabel(item) {
+  return item.displayLabel || item.label;
+}
+
+function getSearchTerms(item) {
+  return uniqueBy(
+    [
+      item.label,
+      item.displayLabel,
+      item.secondaryLabel,
+      ...(item.aliases || []),
+    ].filter(Boolean),
+    (value) => normalize(String(value)),
+  );
+}
+
+function findBuildingItemForName(buildingName) {
+  const normalized = normalize(buildingName || "");
+  return SEARCH_ITEMS.find(
+    (item) =>
+      item.type === "building" &&
+      [item.label, ...(item.aliases || [])].some((value) => normalize(value) === normalized),
+  );
+}
+
+function toDynamicSearchItem(node) {
+  const buildingItem = findBuildingItemForName(node.buildingName);
+  const displayLabel = node.dualLabel || node.label;
+  const secondaryParts = [];
+  if (node.label && node.dualLabel && node.label !== node.dualLabel) {
+    secondaryParts.push(node.label);
+  }
+  if (node.secondaryLabel) {
+    secondaryParts.push(node.secondaryLabel);
+  }
+
+  return {
+    id: `route-node-${node.nodeId}`,
+    type: (node.nodeType || "room").toLowerCase(),
+    label: node.label,
+    displayLabel,
+    secondaryLabel: secondaryParts.join(" • "),
+    aliases: uniqueBy(
+      [node.dualLabel, ...(node.aliases || [])].filter(Boolean),
+      (value) => normalize(String(value)),
+    ),
+    buildingId: buildingItem?.id || null,
+    floor: floorIdFromLevel(node.floorLevel),
+    roomBox: null,
+    routeNodeId: node.nodeId,
+  };
+}
+
+function rankSearchItem(item, term) {
+  const searchTerms = getSearchTerms(item).map(normalize);
+  const displayLabel = normalize(getDisplayLabel(item));
+  const typeRank = item.type === "room" ? 0 : item.type === "building" ? 1 : 2;
+  const exact = searchTerms.some((value) => value === term) ? 0 : 1;
+  const prefix = exact === 0 || searchTerms.some((value) => value.startsWith(term)) ? 0 : 1;
+  return [exact, prefix, typeRank, displayLabel];
+}
+
+function compareSearchItems(left, right, term) {
+  const leftRank = rankSearchItem(left, term);
+  const rightRank = rankSearchItem(right, term);
+  for (let index = 0; index < leftRank.length; index += 1) {
+    if (leftRank[index] < rightRank[index]) return -1;
+    if (leftRank[index] > rightRank[index]) return 1;
+  }
+  return 0;
+}
+
+function mergeSearchResults(staticItems, dynamicItems, term, limit) {
+  return uniqueBy([...dynamicItems, ...staticItems], (item) => `${item.type}:${normalize(getDisplayLabel(item))}`)
+    .sort((left, right) => compareSearchItems(left, right, term))
+    .slice(0, limit);
+}
+
+async function fetchRouteNodeSearch(query, buildingQuery) {
+  const params = new URLSearchParams({ query });
+  if (buildingQuery) {
+    params.set("buildingQuery", buildingQuery);
+  }
+
+  const response = await fetch(`/api/routes/nodes/search?${params.toString()}`);
+  const payload = await response.json().catch(() => []);
+  if (!response.ok) {
+    throw new Error(payload?.error || payload?.message || "Unable to search nodes.");
+  }
+  return Array.isArray(payload) ? payload.map(toDynamicSearchItem) : [];
+}
+
+function refreshSearchResults() {
+  const term = normalize(state.query);
+  const staticMatches =
+    state.searchCommitted || term.length < 2
+      ? []
+      : SEARCH_ITEMS.filter((item) =>
+          getSearchTerms(item).some((value) => normalize(value).includes(term)),
+        );
+
+  if (state.searchCommitted || term.length < 2) {
+    state.searchResults = [];
+    render();
+    return;
+  }
+
+  const requestId = ++state.searchRequestId;
+  state.searchResults = staticMatches.slice(0, 7);
+  render();
+
+  fetchRouteNodeSearch(state.query.trim())
+    .then((dynamicItems) => {
+      if (requestId !== state.searchRequestId) return;
+      state.searchResults = mergeSearchResults(staticMatches, dynamicItems, term, 7);
+      render();
+    })
+    .catch(() => {
+      if (requestId !== state.searchRequestId) return;
+      state.searchResults = staticMatches.slice(0, 7);
+      render();
+    });
+}
+
+function refreshRouteSrcSuggestions() {
+  const raw = state.routePlanner.src.trim();
+  const term = normalize(raw);
+  if (!raw || state.routePlanner.srcConfirmed) {
+    state.routePlanner.srcSuggestions = [];
+    render();
+    return;
+  }
+
+  const buildingQuery = state.activeResult?.buildingId
+    ? SEARCH_ITEMS.find((item) => item.id === state.activeResult.buildingId)?.label
+    : state.activeResult?.type === "building"
+    ? state.activeResult.label
+    : null;
+
+  const staticMatches = SEARCH_ITEMS.filter((item) =>
+    getSearchTerms(item).some((value) => normalize(value).includes(term)),
+  );
+  const requestId = ++state.routePlanner.srcRequestId;
+  state.routePlanner.srcSuggestions = staticMatches.slice(0, 6);
+  render();
+
+  fetchRouteNodeSearch(raw, buildingQuery)
+    .then((dynamicItems) => {
+      if (requestId !== state.routePlanner.srcRequestId) return;
+      state.routePlanner.srcSuggestions = mergeSearchResults(staticMatches, dynamicItems, term, 6);
+      render();
+    })
+    .catch(() => {
+      if (requestId !== state.routePlanner.srcRequestId) return;
+      state.routePlanner.srcSuggestions = staticMatches.slice(0, 6);
+      render();
+    });
 }
 
 function normalizeBearing(value) {
@@ -361,9 +539,7 @@ function getVisibleCamera() {
 function getResults() {
   const term = normalize(state.query);
   if (state.searchCommitted || term.length < 2) return [];
-  return SEARCH_ITEMS.filter((item) =>
-    [item.label, ...(item.aliases || [])].some((value) => normalize(value).includes(term)),
-  ).slice(0, 7);
+  return state.searchResults;
 }
 
 function setCamera(nextCamera, elastic = false) {
@@ -376,12 +552,15 @@ function setCameraFromUpdater(updater, elastic = false) {
 
 function selectResult(item) {
   state.activeResult = item;
-  state.query = item.label;
+  state.query = getDisplayLabel(item);
+  state.searchResults = [];
   state.searchCommitted = true;
   state.routePlanner = {
     stage: "input",
     src: "",
     srcConfirmed: false,
+    srcSuggestions: [],
+    srcRequestId: 0,
   };
 
   if (item.type === "faculty") {
@@ -429,7 +608,7 @@ function setRoutePlannerSrc(value) {
   state.routePlanner.src = value;
   state.routePlanner.srcConfirmed = false;
   state.routePlanner.stage = "input";
-  render();
+  refreshRouteSrcSuggestions();
 }
 
 function angleFromDial(event, dialRef) {
@@ -500,11 +679,7 @@ function render() {
   const visibleCamera = getVisibleCamera();
   const results = getResults();
   const routeSrcSuggestions = state.routePlanner.src.trim() && !state.routePlanner.srcConfirmed
-    ? SEARCH_ITEMS.filter((item) =>
-        [item.label, ...(item.aliases || [])].some((value) =>
-          normalize(value).includes(normalize(state.routePlanner.src)),
-        ),
-      ).slice(0, 6)
+    ? state.routePlanner.srcSuggestions
     : [];
   const activeFloorData =
     COM1_FLOORS.find((floor) => floor.id === state.activeFloor) || COM1_FLOORS[1];
@@ -600,8 +775,8 @@ function render() {
                     ${results
                       .map(
                         (item) => `<button type="button" data-result-id="${item.id}">
-                          <span>${escapeHtml(item.label)}</span>
-                          <small>${item.type}</small>
+                          <span>${escapeHtml(getDisplayLabel(item))}</span>
+                          <small>${escapeHtml(item.secondaryLabel || item.type)}</small>
                         </button>`,
                       )
                       .join("")}
@@ -631,8 +806,8 @@ function render() {
                             ${routeSrcSuggestions
                               .map(
                                 (item) => `<button type="button" data-route-src-suggestion="${item.id}">
-                                  <span>${escapeHtml(item.label)}</span>
-                                  <small>${item.type}</small>
+                                  <span>${escapeHtml(getDisplayLabel(item))}</span>
+                                  <small>${escapeHtml(item.secondaryLabel || item.type)}</small>
                                 </button>`,
                               )
                               .join("")}
@@ -931,15 +1106,15 @@ function bindEvents(root, cameraViewport, visibleCamera) {
       state.activeResult = null;
       state.routePlanner.stage = "input";
       state.routePlanner.srcConfirmed = false;
-      render();
+      refreshSearchResults();
     });
 
     searchInput.addEventListener("keydown", (event) => {
       if (event.key !== "Enter") return;
       event.preventDefault();
       const normalized = normalize(state.query);
-      const exact = SEARCH_ITEMS.find((item) =>
-        [item.label, ...(item.aliases || [])].some((value) => normalize(value) === normalized),
+      const exact = getResults().find((item) =>
+        getSearchTerms(item).some((value) => normalize(value) === normalized),
       );
       if (exact) {
         selectResult(exact);
@@ -952,17 +1127,20 @@ function bindEvents(root, cameraViewport, visibleCamera) {
 
   root.querySelectorAll("[data-result-id]").forEach((button) => {
     button.addEventListener("click", () => {
-      const item = SEARCH_ITEMS.find((entry) => entry.id === button.dataset.resultId);
+      const item = getResults().find((entry) => entry.id === button.dataset.resultId);
       if (item) selectResult(item);
     });
   });
 
   root.querySelectorAll("[data-route-src-suggestion]").forEach((button) => {
     button.addEventListener("click", () => {
-      const item = SEARCH_ITEMS.find((entry) => entry.id === button.dataset.routeSrcSuggestion);
+      const item = state.routePlanner.srcSuggestions.find(
+        (entry) => entry.id === button.dataset.routeSrcSuggestion,
+      );
       if (!item) return;
-      state.routePlanner.src = item.label;
+      state.routePlanner.src = getDisplayLabel(item);
       state.routePlanner.srcConfirmed = true;
+      state.routePlanner.srcSuggestions = [];
       render();
     });
   });
