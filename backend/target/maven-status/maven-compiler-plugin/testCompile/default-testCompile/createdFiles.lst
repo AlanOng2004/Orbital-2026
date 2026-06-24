@@ -1,0 +1,9 @@
+com/orbital/nusmaps/controller/AuthControllerTest.class
+com/orbital/nusmaps/controller/RouteControllerTest.class
+com/orbital/nusmaps/implement/RegisterServiceImplTest.class
+com/orbital/nusmaps/service/JwtServiceTest.class
+com/orbital/nusmaps/model/ModelBehaviorTest.class
+com/orbital/nusmaps/implement/LoginServiceImplTest.class
+com/orbital/nusmaps/exception/GlobalExceptionHandlerTest.class
+com/orbital/nusmaps/controller/AdminAnnotatorImportControllerTest.class
+com/orbital/nusmaps/TestDataFactory.class
