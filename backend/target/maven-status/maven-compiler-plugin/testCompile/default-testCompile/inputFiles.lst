@@ -1,9 +1,0 @@
-/Users/alanong/Documents/GitHub/Orbital-2026/backend/src/test/java/com/orbital/nusmaps/TestDataFactory.java
-/Users/alanong/Documents/GitHub/Orbital-2026/backend/src/test/java/com/orbital/nusmaps/controller/AdminAnnotatorImportControllerTest.java
-/Users/alanong/Documents/GitHub/Orbital-2026/backend/src/test/java/com/orbital/nusmaps/controller/AuthControllerTest.java
-/Users/alanong/Documents/GitHub/Orbital-2026/backend/src/test/java/com/orbital/nusmaps/controller/RouteControllerTest.java
-/Users/alanong/Documents/GitHub/Orbital-2026/backend/src/test/java/com/orbital/nusmaps/exception/GlobalExceptionHandlerTest.java
-/Users/alanong/Documents/GitHub/Orbital-2026/backend/src/test/java/com/orbital/nusmaps/implement/LoginServiceImplTest.java
-/Users/alanong/Documents/GitHub/Orbital-2026/backend/src/test/java/com/orbital/nusmaps/implement/RegisterServiceImplTest.java
-/Users/alanong/Documents/GitHub/Orbital-2026/backend/src/test/java/com/orbital/nusmaps/model/ModelBehaviorTest.java
-/Users/alanong/Documents/GitHub/Orbital-2026/backend/src/test/java/com/orbital/nusmaps/service/JwtServiceTest.java
