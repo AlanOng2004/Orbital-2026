@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import com.orbital.nusmaps.TestDataFactory;
@@ -108,15 +109,18 @@ class RouteControllerTest {
                     }
                     return List.of(accessibleEdge);
                 });
+        when(ssspService.calculatePathWeight(eq(List.of(fastestEdge)), anyMap())).thenReturn(90.0);
+        when(ssspService.calculatePathWeight(eq(List.of(shelteredEdge)), anyMap())).thenReturn(45.0);
+        when(ssspService.calculatePathWeight(eq(List.of(accessibleEdge)), anyMap())).thenReturn(115.5);
 
         SameBuildingRouteResponse response =
                 routeController.getSameBuildingRoutes(new SameBuildingRouteRequest(1L, 2L));
 
         assertEquals("COM1", response.buildingName());
-        assertEquals(List.of("Fastest", "Sheltered", "Accessible"),
+        assertEquals(List.of("Sheltered", "Fastest", "Accessible"),
                 response.routes().stream().map(SameBuildingRouteResponse.RouteOptionResponse::label).toList());
         assertEquals(2, response.routes().get(0).pathNodes().size());
-        assertEquals(1.0, response.routes().get(0).estimatedTimeMinutes());
+        assertEquals(0.5, response.routes().get(0).estimatedTimeMinutes());
     }
 
     @Test

@@ -136,11 +136,7 @@ public class RouteController {
         }
 
         List<Node> pathNodes = buildPathNodes(source, path);
-        double totalWeight = path.stream()
-                .map(Edge::getWeight)
-                .filter(Objects::nonNull)
-                .mapToDouble(Double::doubleValue)
-                .sum();
+        double totalWeight = ssspService.calculatePathWeight(path, perms);
         double estimatedTimeMinutes = roundToOneDecimal(Math.max(0.5, totalWeight / PIXELS_PER_MINUTE));
 
         return new SameBuildingRouteResponse.RouteOptionResponse(
