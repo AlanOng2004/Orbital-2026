@@ -95,14 +95,14 @@ const SEARCH_ITEMS = [
     type: "faculty",
     label: "School of Computing",
     aliases: ["faculty of computing", "soc", "computing"],
-    box: imageBox({ x: 826, y: 1574, width: 470, height: 442 }),
+    box: imageBox({ x: 760, y: 1240, width: 560, height: 360 }),
   },
   {
     id: "com1",
     type: "building",
     label: "COM1",
     aliases: ["computing 1", "com 1", "school of computing"],
-    box: imageBox({ x: 1010, y: 1584, width: 270, height: 354 }),
+    box: imageBox({ x: 941, y: 1331, width: 173, height: 149 }),
     floor: "L1",
   },
   {
@@ -110,7 +110,7 @@ const SEARCH_ITEMS = [
     type: "building",
     label: "COM4",
     aliases: ["computing 4", "com 4"],
-    box: imageBox({ x: 1162, y: 1748, width: 92, height: 66 }),
+    box: imageBox({ x: 1170, y: 1330, width: 85, height: 70 }),
   },
   {
     id: "lt15",
