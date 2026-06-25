@@ -6,8 +6,8 @@ export const campusConfig = {
       rotation: 28.5,
       // These coordinates pin the overlay directly onto the orange COM1 footprint
       anchor: {
-        x: 820,
-        y: 2010,
+        x: 620,
+        y: 1010,
         width: 145,
         height: 80,
       },
