@@ -141,6 +141,13 @@ const SEARCH_ITEMS = [
 
 const QUICK_ACTIONS = ["🍴 Food", "📖 Empty Rooms", "🚻 Toilets", "🚌 Bus Stop"];
 const ROUTE_OPTIONS = ["Less walking", "Walking only", "Sheltered Paths", "No keycard"];
+const DRIVER_VERSION = "1.5.0";
+const DRIVER_CSS_ID = "driverjs-theme";
+const DRIVER_SCRIPT_ID = "driverjs-script";
+const TOUR_STORAGE_KEY = "points_app_tour_seen";
+
+let activeTour = null;
+let pendingTourStart = false;
 
 function getStoredSession() {
   try {
@@ -859,6 +866,341 @@ function restoreUi() {
   }
 }
 
+function getCom1Item() {
+  return SEARCH_ITEMS.find((item) => item.id === "com1") || null;
+}
+
+function snapshotTourState() {
+  return {
+    camera: state.camera ? { ...state.camera } : null,
+    query: state.query,
+    searchResults: [...state.searchResults],
+    searchCommitted: state.searchCommitted,
+    activeResult: state.activeResult,
+    mode: state.mode,
+    activeFloor: state.activeFloor,
+    activeRoom: state.activeRoom,
+    sideMenuOpen: state.sideMenuOpen,
+    expandedMenus: { ...state.expandedMenus },
+    routePlanner: {
+      ...state.routePlanner,
+      srcSuggestions: [...state.routePlanner.srcSuggestions],
+      dstSuggestions: [...state.routePlanner.dstSuggestions],
+      routes: [...state.routePlanner.routes],
+    },
+    hideOptions: { ...state.hideOptions },
+  };
+}
+
+function restoreTourState(snapshot) {
+  if (!snapshot) return;
+  state.camera = snapshot.camera ? { ...snapshot.camera } : state.camera;
+  state.query = snapshot.query;
+  state.searchResults = [...snapshot.searchResults];
+  state.searchCommitted = snapshot.searchCommitted;
+  state.activeResult = snapshot.activeResult;
+  state.mode = snapshot.mode;
+  state.activeFloor = snapshot.activeFloor;
+  state.activeRoom = snapshot.activeRoom;
+  state.sideMenuOpen = snapshot.sideMenuOpen;
+  state.expandedMenus = { ...snapshot.expandedMenus };
+  state.routePlanner = {
+    ...snapshot.routePlanner,
+    srcSuggestions: [...snapshot.routePlanner.srcSuggestions],
+    dstSuggestions: [...snapshot.routePlanner.dstSuggestions],
+    routes: [...snapshot.routePlanner.routes],
+  };
+  state.hideOptions = { ...snapshot.hideOptions };
+}
+
+function prepareTourStep(stepId) {
+  const com1 = getCom1Item();
+  state.hideOptions.ui = false;
+
+  if (stepId === "search" || stepId === "quick-actions" || stepId === "menu-handle") {
+    state.sideMenuOpen = false;
+    state.mode = "home";
+    state.activeRoom = null;
+    if (com1?.box) {
+      selectResult(com1);
+      state.query = "";
+      state.searchCommitted = false;
+      state.searchResults = [];
+      state.activeResult = com1;
+    }
+    render();
+    return;
+  }
+
+  if (stepId === "side-menu") {
+    state.sideMenuOpen = true;
+    render();
+    return;
+  }
+
+  if (stepId === "route-planner") {
+    if (com1?.box) {
+      selectResult(com1);
+      state.query = com1.label;
+      state.searchCommitted = true;
+      state.activeResult = com1;
+    }
+    state.mode = "home";
+    state.sideMenuOpen = false;
+    render();
+    return;
+  }
+
+  if (stepId === "indoor-map" || stepId === "floors") {
+    if (com1?.box) {
+      selectResult(com1);
+      state.activeResult = com1;
+    }
+    state.mode = "map";
+    state.activeFloor = stepId === "floors" ? "L2" : "L1";
+    state.sideMenuOpen = false;
+    render();
+    return;
+  }
+
+  if (stepId === "compass" || stepId === "locate") {
+    state.mode = "home";
+    state.sideMenuOpen = false;
+    render();
+  }
+}
+
+function ensureDriverJs() {
+  if (window.driver?.js?.driver) {
+    return Promise.resolve(window.driver.js.driver);
+  }
+
+  const existingScript = document.getElementById(DRIVER_SCRIPT_ID);
+  if (existingScript?.dataset.ready === "true" && window.driver?.js?.driver) {
+    return Promise.resolve(window.driver.js.driver);
+  }
+
+  if (!document.getElementById(DRIVER_CSS_ID)) {
+    const link = document.createElement("link");
+    link.id = DRIVER_CSS_ID;
+    link.rel = "stylesheet";
+    link.href = `https://cdn.jsdelivr.net/npm/driver.js@${DRIVER_VERSION}/dist/driver.css`;
+    document.head.appendChild(link);
+  }
+
+  return new Promise((resolve, reject) => {
+    if (existingScript) {
+      existingScript.addEventListener(
+        "load",
+        () => {
+          if (!window.driver?.js?.driver) {
+            reject(new Error("Walkthrough library is unavailable."));
+            return;
+          }
+          resolve(window.driver.js.driver);
+        },
+        { once: true },
+      );
+      existingScript.addEventListener("error", () => reject(new Error("Unable to load walkthrough.")), {
+        once: true,
+      });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = DRIVER_SCRIPT_ID;
+    script.src = `https://cdn.jsdelivr.net/npm/driver.js@${DRIVER_VERSION}/dist/driver.js.iife.js`;
+    script.async = true;
+    script.addEventListener(
+      "load",
+      () => {
+        script.dataset.ready = "true";
+        if (!window.driver?.js?.driver) {
+          reject(new Error("Walkthrough library is unavailable."));
+          return;
+        }
+        resolve(window.driver.js.driver);
+      },
+      { once: true },
+    );
+    script.addEventListener("error", () => reject(new Error("Unable to load walkthrough.")), {
+      once: true,
+    });
+    document.head.appendChild(script);
+  });
+}
+
+function startTutorial(force = false) {
+  if (pendingTourStart || activeTour) return;
+  pendingTourStart = true;
+
+  const restoreSnapshot = snapshotTourState();
+
+  ensureDriverJs()
+    .then((driverFactory) => {
+      if (typeof driverFactory !== "function") {
+        throw new Error("Walkthrough library is unavailable.");
+      }
+
+      const stepOrder = [
+        "search",
+        "quick-actions",
+        "menu-handle",
+        "side-menu",
+        "route-planner",
+        "indoor-map",
+        "floors",
+        "compass",
+        "locate",
+      ];
+
+      const steps = [
+        {
+          popover: {
+            title: "Welcome to NUS Maps",
+            description:
+              "This quick walkthrough shows the main ways to search places, open building floors, and navigate around campus.",
+            side: "over",
+            align: "center",
+          },
+        },
+        {
+          element: "#searchInput",
+          popover: {
+            title: "Search anything fast",
+            description:
+              "Type a faculty, building, or room here. Press Enter to jump to the best match or click a suggestion.",
+            side: "bottom",
+            align: "start",
+          },
+          onHighlightStarted: () => prepareTourStep("search"),
+        },
+        {
+          element: ".quickActions",
+          popover: {
+            title: "Use quick filters",
+            description:
+              "These shortcuts are meant for common needs like food, empty rooms, toilets, and bus stops.",
+            side: "bottom",
+            align: "start",
+          },
+          onHighlightStarted: () => prepareTourStep("quick-actions"),
+        },
+        {
+          element: "#menuHandle",
+          popover: {
+            title: "Open the side menu",
+            description:
+              "Use this handle to reveal bookmarks, recent activity, route preferences, and visibility settings.",
+            side: "right",
+            align: "center",
+          },
+          onHighlightStarted: () => prepareTourStep("menu-handle"),
+        },
+        {
+          element: ".sideMenu",
+          popover: {
+            title: "Adjust your workspace",
+            description:
+              "The side menu keeps your saved places nearby and lets you hide overlays like the legend, compass, or UI.",
+            side: "right",
+            align: "start",
+          },
+          onHighlightStarted: () => prepareTourStep("side-menu"),
+        },
+        {
+          element: ".routePlannerPanel",
+          popover: {
+            title: "Plan an indoor route",
+            description:
+              "After selecting a destination, enter a source here and choose from suggestions to generate indoor routes.",
+            side: "right",
+            align: "start",
+          },
+          onHighlightStarted: () => prepareTourStep("route-planner"),
+        },
+        {
+          element: "#floorOverlay .floorSheet",
+          popover: {
+            title: "View the building floorplan",
+            description:
+              "Selecting COM1 opens its floor image. Click outside the sheet when you want to return to the campus map.",
+            side: "left",
+            align: "center",
+          },
+          onHighlightStarted: () => prepareTourStep("indoor-map"),
+        },
+        {
+          element: ".routePlannerFloors",
+          popover: {
+            title: "Switch floors",
+            description:
+              "Use these buttons to move between B1 and upper levels. When a route is active, the buttons also show which floors are on the path.",
+            side: "left",
+            align: "start",
+          },
+          onHighlightStarted: () => prepareTourStep("floors"),
+        },
+        {
+          element: "#compassButton",
+          popover: {
+            title: "Reset orientation",
+            description:
+              "The compass snaps the map back to true north, while the dial below it lets you rotate the view manually.",
+            side: "left",
+            align: "center",
+          },
+          onHighlightStarted: () => prepareTourStep("compass"),
+        },
+        {
+          element: "#locateButton",
+          popover: {
+            title: "Use your location",
+            description:
+              "Tap this button to allow geolocation and anchor the experience to your current position on campus.",
+            side: "left",
+            align: "center",
+          },
+          onHighlightStarted: () => prepareTourStep("locate"),
+        },
+      ];
+
+      const tour = driverFactory({
+        showProgress: true,
+        allowClose: true,
+        animate: true,
+        smoothScroll: true,
+        overlayOpacity: 0.66,
+        disableActiveInteraction: false,
+        stagePadding: 10,
+        nextBtnText: "Next",
+        prevBtnText: "Back",
+        doneBtnText: "Done",
+        steps,
+        onDestroyed: () => {
+          activeTour = null;
+          restoreTourState(restoreSnapshot);
+          render();
+          if (!force) {
+            localStorage.setItem(TOUR_STORAGE_KEY, "true");
+          }
+        },
+      });
+
+      activeTour = { tour, stepOrder };
+      prepareTourStep(stepOrder[0]);
+      tour.drive();
+    })
+    .catch((error) => {
+      restoreTourState(restoreSnapshot);
+      render();
+      window.alert(error.message || "Unable to start walkthrough.");
+    })
+    .finally(() => {
+      pendingTourStart = false;
+    });
+}
+
 function render() {
   const root = document.getElementById("appRoot");
   const activeElement = document.activeElement;
@@ -975,6 +1317,7 @@ function render() {
                 placeholder="Search for: Faculty, Building, Room..."
                 aria-label="Search for faculty, building, or room"
               />
+              <button id="tourButton" type="button" class="tourButton">How to use</button>
             </div>
             ${
               results.length > 0
@@ -1433,6 +1776,7 @@ function bindEvents(root, cameraViewport, visibleCamera) {
   const routeSrcInput = root.querySelector("#routeSrcInput");
   const routeDstInput = root.querySelector("#routeDstInput");
   const routePlannerGo = root.querySelector("#routePlannerGo");
+  const tourButton = root.querySelector("#tourButton");
   const menuHandle = root.querySelector("#menuHandle");
   const locateButton = root.querySelector("#locateButton");
   const compassButton = root.querySelector("#compassButton");
@@ -1571,6 +1915,10 @@ function bindEvents(root, cameraViewport, visibleCamera) {
       state.routePlanner.srcConfirmed = true;
       submitRoutePlanner();
     });
+  }
+
+  if (tourButton) {
+    tourButton.addEventListener("click", () => startTutorial(true));
   }
 
   root.querySelectorAll("[data-floor-id]").forEach((button) => {
@@ -1769,3 +2117,7 @@ state.camera = constrainCamera(
 );
 
 render();
+
+if (!localStorage.getItem(TOUR_STORAGE_KEY)) {
+  window.setTimeout(() => startTutorial(false), 450);
+}

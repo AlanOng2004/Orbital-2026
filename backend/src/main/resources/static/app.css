@@ -106,6 +106,24 @@
   font-size: 16px;
 }
 
+.tourButton {
+  flex: 0 0 auto;
+  min-height: 22px;
+  padding: 0 10px;
+  border: 1px solid rgba(20, 119, 212, 0.18);
+  border-radius: 999px;
+  background: #edf6ff;
+  color: #0f5ea8;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tourButton:hover {
+  background: #dbeeff;
+}
+
 .resultList {
   position: absolute;
   top: 42px;
