@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyMap;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import com.orbital.nusmaps.TestDataFactory;
@@ -18,9 +17,7 @@ import com.orbital.nusmaps.model.Node;
 import com.orbital.nusmaps.repository.NodeRepository;
 import com.orbital.nusmaps.service.SSSPService;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.function.DoubleUnaryOperator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -84,43 +81,40 @@ class RouteControllerTest {
     }
 
     @Test
-    void getSameBuildingRoutesBuildsSortedRouteOptions() {
+    void getSameBuildingRoutesBuildsSingleRouteWithDirections() {
         Building building = TestDataFactory.building(1L, "COM1");
         Floorplan floorplan = TestDataFactory.floorplan(2L, building, 1, "L1.png");
-        Node source = TestDataFactory.node(1L, "Entrance", null, Node.NodeType.Room, floorplan, 1, 1);
-        Node target = TestDataFactory.node(2L, "Lab", null, Node.NodeType.Room, floorplan, 5, 5);
+        Node source = TestDataFactory.node(1L, "COM1-01-01", null, Node.NodeType.Room, floorplan, 0, 0);
+        Node corridor = TestDataFactory.node(2L, "Aisle", null, Node.NodeType.Corridor, floorplan, 0, 30);
+        Node target = TestDataFactory.node(3L, "COM1-01-02", null, Node.NodeType.Room, floorplan, 30, 30);
 
-        Edge fastestEdge = TestDataFactory.edge(1L, source, target, 90);
-        Edge shelteredEdge = TestDataFactory.edge(2L, source, target, 100);
-        shelteredEdge.setSheltered(true);
-        Edge accessibleEdge = TestDataFactory.edge(3L, source, target, 110);
-        accessibleEdge.setElevator(true);
+        Edge firstEdge = TestDataFactory.edge(1L, source, corridor, 30);
+        Edge secondEdge = TestDataFactory.edge(2L, corridor, target, 30);
 
         when(nodeRepository.findRouteNodeById(1L)).thenReturn(Optional.of(source));
         when(nodeRepository.findRouteNodeById(2L)).thenReturn(Optional.of(target));
-        when(ssspService.SSSP(org.mockito.ArgumentMatchers.eq(source), org.mockito.ArgumentMatchers.eq(target), anyMap()))
-                .thenAnswer(invocation -> {
-                    Map<Edge.EdgeTag, DoubleUnaryOperator> perms = invocation.getArgument(2);
-                    if (perms.isEmpty()) {
-                        return List.of(fastestEdge);
-                    }
-                    if (perms.containsKey(Edge.EdgeTag.Sheltered)) {
-                        return List.of(shelteredEdge);
-                    }
-                    return List.of(accessibleEdge);
-                });
-        when(ssspService.calculatePathWeight(eq(List.of(fastestEdge)), anyMap())).thenReturn(90.0);
-        when(ssspService.calculatePathWeight(eq(List.of(shelteredEdge)), anyMap())).thenReturn(45.0);
-        when(ssspService.calculatePathWeight(eq(List.of(accessibleEdge)), anyMap())).thenReturn(115.5);
+        when(ssspService.SSSP(source, target, java.util.Map.of())).thenReturn(List.of(firstEdge, secondEdge));
+        when(ssspService.calculatePathWeight(List.of(firstEdge, secondEdge), java.util.Map.of())).thenReturn(60.0);
 
         SameBuildingRouteResponse response =
                 routeController.getSameBuildingRoutes(new SameBuildingRouteRequest(1L, 2L));
 
         assertEquals("COM1", response.buildingName());
-        assertEquals(List.of("Sheltered", "Fastest", "Accessible"),
-                response.routes().stream().map(SameBuildingRouteResponse.RouteOptionResponse::label).toList());
-        assertEquals(2, response.routes().get(0).pathNodes().size());
-        assertEquals(0.5, response.routes().get(0).estimatedTimeMinutes());
+        assertEquals("Indoor route", response.route().label());
+        assertEquals(3, response.route().pathNodes().size());
+        assertEquals(0.7, response.route().estimatedTimeMinutes());
+        assertEquals(
+                List.of(
+                        "Exit COM1-01-01",
+                        "Walk 21 metres",
+                        "Turn right toward COM1-01-02",
+                        "Walk 21 metres",
+                        "Enter COM1-01-02"
+                ),
+                response.route().instructions().stream()
+                        .map(SameBuildingRouteResponse.RouteInstructionResponse::instruction)
+                        .toList()
+        );
     }
 
     @Test

@@ -6,14 +6,14 @@ public record SameBuildingRouteResponse(
         String buildingName,
         Long sourceNodeId,
         Long targetNodeId,
-        List<RouteOptionResponse> routes
+        RouteResponse route
 ) {
-    public record RouteOptionResponse(
-            String routeId,
+    public record RouteResponse(
             String label,
             double estimatedTimeMinutes,
             double totalWeight,
-            List<RoutePathNodeResponse> pathNodes
+            List<RoutePathNodeResponse> pathNodes,
+            List<RouteInstructionResponse> instructions
     ) {}
 
     public record RoutePathNodeResponse(
@@ -24,5 +24,10 @@ public record SameBuildingRouteResponse(
             String floorImageUrl,
             Double x,
             Double y
+    ) {}
+
+    public record RouteInstructionResponse(
+            String instruction,
+            Integer distanceMeters
     ) {}
 }

@@ -204,8 +204,7 @@ const state = {
     dstSuggestions: [],
     dstRequestId: 0,
     dstSelection: null,
-    routes: [],
-    selectedRouteId: null,
+    route: null,
     loading: false,
     error: "",
   },
@@ -308,7 +307,7 @@ function getRouteDescription(route) {
 }
 
 function getSelectedRoute() {
-  return state.routePlanner.routes.find((route) => route.routeId === state.routePlanner.selectedRouteId) || null;
+  return state.routePlanner.route || null;
 }
 
 function getRouteNodesForFloor(route, floorId) {
@@ -715,8 +714,7 @@ function selectResult(item) {
     dstSuggestions: [],
     dstRequestId: 0,
     dstSelection: item,
-    routes: [],
-    selectedRouteId: null,
+    route: null,
     loading: false,
     error: "",
   };
@@ -780,20 +778,18 @@ function submitRoutePlanner() {
         throw new Error(payload?.error || payload?.message || "Unable to compute route.");
       }
 
-      state.routePlanner.routes = Array.isArray(payload.routes) ? payload.routes : [];
-      state.routePlanner.selectedRouteId = state.routePlanner.routes[0]?.routeId || null;
+      state.routePlanner.route = payload?.route || null;
       state.routePlanner.stage = "results";
       state.routePlanner.loading = false;
-      if (state.routePlanner.routes[0]) {
-        openSelectedRouteFloor(state.routePlanner.routes[0]);
+      if (state.routePlanner.route) {
+        openSelectedRouteFloor(state.routePlanner.route);
       }
       render();
     })
     .catch((error) => {
       state.routePlanner.loading = false;
       state.routePlanner.error = error.message || "Unable to compute route.";
-      state.routePlanner.routes = [];
-      state.routePlanner.selectedRouteId = null;
+      state.routePlanner.route = null;
       render();
     });
 }
@@ -803,8 +799,7 @@ function setRoutePlannerSrc(value) {
   state.routePlanner.srcConfirmed = false;
   state.routePlanner.srcSelection = null;
   state.routePlanner.stage = "input";
-  state.routePlanner.routes = [];
-  state.routePlanner.selectedRouteId = null;
+  state.routePlanner.route = null;
   state.routePlanner.error = "";
   refreshRouteSrcSuggestions();
 }
@@ -814,8 +809,7 @@ function setRoutePlannerDst(value) {
   state.routePlanner.dstConfirmed = false;
   state.routePlanner.dstSelection = null;
   state.routePlanner.stage = "input";
-  state.routePlanner.routes = [];
-  state.routePlanner.selectedRouteId = null;
+  state.routePlanner.route = null;
   state.routePlanner.error = "";
   refreshRouteDstSuggestions();
 }
@@ -892,7 +886,6 @@ function snapshotTourState() {
       ...state.routePlanner,
       srcSuggestions: [...state.routePlanner.srcSuggestions],
       dstSuggestions: [...state.routePlanner.dstSuggestions],
-      routes: [...state.routePlanner.routes],
     },
     hideOptions: { ...state.hideOptions },
   };
@@ -914,7 +907,6 @@ function restoreTourState(snapshot) {
     ...snapshot.routePlanner,
     srcSuggestions: [...snapshot.routePlanner.srcSuggestions],
     dstSuggestions: [...snapshot.routePlanner.dstSuggestions],
-    routes: [...snapshot.routePlanner.routes],
   };
   state.hideOptions = { ...snapshot.hideOptions };
 }
@@ -932,8 +924,7 @@ function resetRoutePlannerState() {
     dstSuggestions: [],
     dstRequestId: 0,
     dstSelection: null,
-    routes: [],
-    selectedRouteId: null,
+    route: null,
     loading: false,
     error: "",
   };
@@ -1430,27 +1421,6 @@ function render() {
                         : ""
                     }
                     ${
-                      state.routePlanner.stage === "results"
-                        ? `<div class="routePlannerResults">
-                            ${state.routePlanner.routes
-                              .map(
-                                (route) => `<button
-                                  type="button"
-                                  class="routePlannerResultCard ${
-                                    route.routeId === state.routePlanner.selectedRouteId ? "isActive" : ""
-                                  }"
-                                  data-route-id="${escapeHtml(route.routeId)}"
-                                >
-                                  <strong>${escapeHtml(route.label)}</strong>
-                                  <span>${escapeHtml(String(route.estimatedTimeMinutes))} min</span>
-                                  <p>${escapeHtml(getRouteDescription(route))}</p>
-                                </button>`,
-                              )
-                              .join("")}
-                          </div>`
-                        : ""
-                    }
-                    ${
                       state.mode === "map"
                         ? `<div class="routePlannerFloors" aria-label="Floor selector">
                             ${COM1_FLOORS.slice()
@@ -1473,6 +1443,23 @@ function render() {
                               )
                               .join("")}
                           </div>`
+                        : ""
+                    }
+                    ${
+                      state.routePlanner.stage === "results"
+                        ? state.routePlanner.route
+                          ? `<div class="routePlannerResults">
+                              <article class="routePlannerSummary">
+                                <strong>${escapeHtml(state.routePlanner.route.label)}</strong>
+                                <span>${escapeHtml(String(state.routePlanner.route.estimatedTimeMinutes))} min</span>
+                                <p>${escapeHtml(getRouteDescription(state.routePlanner.route))}</p>
+                              </article>
+                              <section class="routePlannerDirections">
+                                <div class="routePlannerDirections__title">Directions</div>
+                                ${renderRouteInstructions(state.routePlanner.route)}
+                              </section>
+                            </div>`
+                          : ""
                         : ""
                     }
                   </section>`
@@ -1853,6 +1840,29 @@ function renderHideCheckbox(key, label) {
   } /><span>${escapeHtml(label)}</span></label>`;
 }
 
+function renderRouteInstructions(route) {
+  if (!route || !Array.isArray(route.instructions) || route.instructions.length === 0) {
+    return "";
+  }
+
+  return `<div class="routePlannerDirections__body">
+    <ol class="routeInstructionList">
+      ${route.instructions
+        .map(
+          (step) => `<li>
+            <strong>${escapeHtml(step.instruction)}</strong>
+            ${
+              Number.isFinite(step.distanceMeters)
+                ? `<span>${escapeHtml(String(step.distanceMeters))} m</span>`
+                : ""
+            }
+          </li>`,
+        )
+        .join("")}
+    </ol>
+  </div>`;
+}
+
 function bindEvents(root, cameraViewport, visibleCamera) {
   const mapStage = root.querySelector(".mapStage");
   const floorOverlay = root.querySelector("#floorOverlay");
@@ -1926,14 +1936,6 @@ function bindEvents(root, cameraViewport, visibleCamera) {
       state.routePlanner.dstConfirmed = true;
       state.routePlanner.dstSelection = item;
       state.routePlanner.dstSuggestions = [];
-      render();
-    });
-  });
-
-  root.querySelectorAll("[data-route-id]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.routePlanner.selectedRouteId = button.dataset.routeId;
-      openSelectedRouteFloor(getSelectedRoute());
       render();
     });
   });
