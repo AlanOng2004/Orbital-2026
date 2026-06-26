@@ -209,6 +209,9 @@ body {
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 18px 45px rgba(23, 37, 52, 0.16);
   pointer-events: auto;
+  max-height: calc(100vh - 130px);
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .routePlannerPanel__title {
@@ -338,14 +341,9 @@ body {
   box-sizing: border-box;
 }
 
-.routePlannerResultCard {
-  cursor: pointer;
-  text-align: left;
-}
-
-.routePlannerResultCard.isActive {
-  border-color: rgba(20, 119, 212, 0.42);
-  box-shadow: 0 10px 24px rgba(20, 119, 212, 0.16);
+.routePlannerSummary {
+  border-color: rgba(20, 119, 212, 0.24);
+  box-shadow: 0 10px 24px rgba(20, 119, 212, 0.1);
 }
 
 .routePlannerResults strong {
@@ -369,11 +367,71 @@ body {
   line-height: 1.35;
 }
 
+.routePlannerDirections {
+  display: flex;
+  flex-direction: column;
+  height: 240px;
+  min-height: 240px;
+  max-height: 240px;
+  padding: 10px 10px 8px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 12px;
+  background: rgba(244, 247, 250, 0.92);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.routePlannerDirections__title {
+  flex: 0 0 auto;
+  color: #17324b;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.routePlannerDirections__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.routeInstructionList {
+  margin: 0;
+  padding: 0 0 0 18px;
+  color: #243746;
+}
+
+.routeInstructionList li {
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.routeInstructionList li:last-child {
+  margin-bottom: 0;
+}
+
+.routeInstructionList strong {
+  display: inline;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.routeInstructionList span {
+  margin-left: 6px;
+  color: #5a6b7b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .routePlannerFloors {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 14px;
+  margin-bottom: 10px;
 }
 
 .routePlannerFloors button {
