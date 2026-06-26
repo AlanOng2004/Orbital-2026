@@ -107,9 +107,47 @@ class RouteControllerTest {
                 List.of(
                         "Exit COM1-01-01",
                         "Walk 21 metres",
-                        "Turn right toward COM1-01-02",
+                        "Turn left toward COM1-01-02",
                         "Walk 21 metres",
                         "Enter COM1-01-02"
+                ),
+                response.route().instructions().stream()
+                        .map(SameBuildingRouteResponse.RouteInstructionResponse::instruction)
+                        .toList()
+        );
+    }
+
+    @Test
+    void getSameBuildingRoutesUsesNodeSpecificTurnTargets() {
+        Building building = TestDataFactory.building(1L, "COM1");
+        Floorplan floorplan = TestDataFactory.floorplan(2L, building, 1, "L1.png");
+        Node source = TestDataFactory.node(1L, "COM1-01-01", null, Node.NodeType.Room, floorplan, 0, 0);
+        Node corridor = TestDataFactory.node(2L, "Corridor", null, Node.NodeType.Corridor, floorplan, 0, 30);
+        Node junction = TestDataFactory.node(3L, "Junction A", null, Node.NodeType.Junction, floorplan, 30, 30);
+        Node stair = TestDataFactory.node(4L, "Staircase B", null, Node.NodeType.Stair, floorplan, 30, 60);
+
+        Edge firstEdge = TestDataFactory.edge(1L, source, corridor, 30);
+        Edge secondEdge = TestDataFactory.edge(2L, corridor, junction, 30);
+        Edge thirdEdge = TestDataFactory.edge(3L, junction, stair, 30);
+
+        when(nodeRepository.findRouteNodeById(1L)).thenReturn(Optional.of(source));
+        when(nodeRepository.findRouteNodeById(4L)).thenReturn(Optional.of(stair));
+        when(ssspService.SSSP(source, stair, java.util.Map.of())).thenReturn(List.of(firstEdge, secondEdge, thirdEdge));
+        when(ssspService.calculatePathWeight(List.of(firstEdge, secondEdge, thirdEdge), java.util.Map.of()))
+                .thenReturn(90.0);
+
+        SameBuildingRouteResponse response =
+                routeController.getSameBuildingRoutes(new SameBuildingRouteRequest(1L, 4L));
+
+        assertEquals(
+                List.of(
+                        "Exit COM1-01-01",
+                        "Walk 21 metres",
+                        "Turn left toward the aisle",
+                        "Walk 21 metres",
+                        "Turn right toward Staircase B",
+                        "Walk 21 metres",
+                        "Enter Staircase B"
                 ),
                 response.route().instructions().stream()
                         .map(SameBuildingRouteResponse.RouteInstructionResponse::instruction)

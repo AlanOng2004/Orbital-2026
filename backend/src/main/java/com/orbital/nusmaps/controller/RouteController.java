@@ -259,14 +259,23 @@ public class RouteController {
     }
 
     private String buildTurnInstruction(TurnDirection turn, Node next) {
-        String destination = next.getNodeType() == Node.NodeType.Room
-                ? next.getNodeName()
-                : "the aisle";
+        String destination = describeTurnTarget(next);
         return switch (turn) {
             case LEFT -> "Turn left toward " + destination;
             case RIGHT -> "Turn right toward " + destination;
             case U_TURN -> "Make a U-turn";
             case STRAIGHT -> "Continue straight";
+        };
+    }
+
+    private String describeTurnTarget(Node next) {
+        if (next == null || next.getNodeType() == null) {
+            return "the aisle";
+        }
+
+        return switch (next.getNodeType()) {
+            case Corridor, Junction -> "the aisle";
+            case Stair, Room, Toilet, Food, Bus_stop -> next.getNodeName();
         };
     }
 
@@ -306,8 +315,9 @@ public class RouteController {
             return TurnDirection.U_TURN;
         }
 
+        // Screen coordinates grow downward on the y-axis, so the usual cross-product sign is inverted.
         double cross = vectorAX * vectorBY - vectorAY * vectorBX;
-        return cross > 0 ? TurnDirection.LEFT : TurnDirection.RIGHT;
+        return cross < 0 ? TurnDirection.LEFT : TurnDirection.RIGHT;
     }
 
     private RouteNodeOptionResponse toRouteNodeOption(Node node) {
