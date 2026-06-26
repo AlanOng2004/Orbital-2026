@@ -132,6 +132,18 @@ body {
   background: #dbeeff;
 }
 
+.tourPopover--centered {
+  left: 50% !important;
+  top: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+.tourPopover--centered .driver-popover-arrow {
+  display: none !important;
+}
+
 .resultList {
   position: absolute;
   top: 42px;

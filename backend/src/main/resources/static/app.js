@@ -1090,7 +1090,6 @@ function startTutorial(force = false) {
         "quick-actions",
         "menu-handle",
         "side-menu",
-        "locate",
         "com1-search",
         "indoor-map",
         "floors",
@@ -1104,8 +1103,9 @@ function startTutorial(force = false) {
             title: "Search anything fast",
             description:
               "Welcome to NUS Maps. Start here by typing a faculty, building, or room, then press Enter or click a suggestion.",
-            side: "bottom",
-            align: "start",
+            side: "over",
+            align: "center",
+            popoverClass: "tourPopover--centered",
           },
           onHighlightStarted: () => prepareTourStep("search"),
         },
@@ -1115,8 +1115,9 @@ function startTutorial(force = false) {
             title: "Use quick filters",
             description:
               "These shortcuts are meant for common needs like food, empty rooms, toilets, and bus stops.",
-            side: "bottom",
-            align: "start",
+            side: "over",
+            align: "center",
+            popoverClass: "tourPopover--centered",
           },
           onHighlightStarted: () => prepareTourStep("quick-actions"),
         },
@@ -1137,28 +1138,18 @@ function startTutorial(force = false) {
             title: "Adjust your workspace",
             description:
               "The side menu keeps your saved places nearby and lets you hide overlays like the legend, compass, or UI.",
-            side: "right",
-            align: "start",
+            side: "over",
+            align: "center",
+            popoverClass: "tourPopover--centered",
           },
           onHighlightStarted: () => prepareTourStep("side-menu"),
-        },
-        {
-          element: "#locateButton",
-          popover: {
-            title: "Use your location",
-            description:
-              "This returns to the normal campus view after the menu step. Tap here to allow geolocation and anchor the map to your current position.",
-            side: "left",
-            align: "center",
-          },
-          onHighlightStarted: () => prepareTourStep("locate"),
         },
         {
           element: ".searchShell",
           popover: {
             title: "Search for COM1",
             description:
-              "Step 6 uses COM1 as the example. Entering COM1 here zooms the campus map into that building so you can inspect it more closely.",
+              "Use COM1 as the example here. Entering COM1 zooms the campus map into that building so you can inspect it more closely.",
             side: "bottom",
             align: "start",
           },
