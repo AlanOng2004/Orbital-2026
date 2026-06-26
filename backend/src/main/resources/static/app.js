@@ -148,6 +148,12 @@ const TOUR_STORAGE_KEY = "points_app_tour_seen";
 
 let activeTour = null;
 let pendingTourStart = false;
+const DEFAULT_CAMERA = {
+  centerX: MAP.width / 2,
+  centerY: MAP.height / 2,
+  zoom: 0.42,
+  bearing: 0,
+};
 
 function getStoredSession() {
   try {
@@ -913,32 +919,70 @@ function restoreTourState(snapshot) {
   state.hideOptions = { ...snapshot.hideOptions };
 }
 
+function resetRoutePlannerState() {
+  state.routePlanner = {
+    stage: "input",
+    src: "",
+    srcConfirmed: false,
+    srcSuggestions: [],
+    srcRequestId: 0,
+    srcSelection: null,
+    dst: "",
+    dstConfirmed: false,
+    dstSuggestions: [],
+    dstRequestId: 0,
+    dstSelection: null,
+    routes: [],
+    selectedRouteId: null,
+    loading: false,
+    error: "",
+  };
+}
+
+function resetToDefaultMap() {
+  state.hideOptions.ui = false;
+  state.sideMenuOpen = false;
+  state.mode = "home";
+  state.activeResult = null;
+  state.activeRoom = null;
+  state.activeFloor = "L1";
+  state.query = "";
+  state.searchResults = [];
+  state.searchCommitted = false;
+  state.expandedMenus = {};
+  resetRoutePlannerState();
+  setCamera(DEFAULT_CAMERA);
+}
+
+function renderForTourStep() {
+  render();
+  window.setTimeout(() => activeTour?.tour?.refresh?.(), 0);
+  window.setTimeout(() => activeTour?.tour?.refresh?.(), 120);
+}
+
 function prepareTourStep(stepId) {
   const com1 = getCom1Item();
-  state.hideOptions.ui = false;
 
   if (stepId === "search" || stepId === "quick-actions" || stepId === "menu-handle") {
-    state.sideMenuOpen = false;
-    state.mode = "home";
-    state.activeRoom = null;
-    if (com1?.box) {
-      selectResult(com1);
-      state.query = "";
-      state.searchCommitted = false;
-      state.searchResults = [];
-      state.activeResult = com1;
-    }
-    render();
+    resetToDefaultMap();
+    renderForTourStep();
     return;
   }
 
   if (stepId === "side-menu") {
+    resetToDefaultMap();
     state.sideMenuOpen = true;
-    render();
+    renderForTourStep();
     return;
   }
 
-  if (stepId === "route-planner") {
+  if (stepId === "locate") {
+    resetToDefaultMap();
+    renderForTourStep();
+    return;
+  }
+
+  if (stepId === "com1-search") {
     if (com1?.box) {
       selectResult(com1);
       state.query = com1.label;
@@ -947,7 +991,7 @@ function prepareTourStep(stepId) {
     }
     state.mode = "home";
     state.sideMenuOpen = false;
-    render();
+    renderForTourStep();
     return;
   }
 
@@ -959,14 +1003,13 @@ function prepareTourStep(stepId) {
     state.mode = "map";
     state.activeFloor = stepId === "floors" ? "L2" : "L1";
     state.sideMenuOpen = false;
-    render();
+    renderForTourStep();
     return;
   }
 
-  if (stepId === "compass" || stepId === "locate") {
-    state.mode = "home";
-    state.sideMenuOpen = false;
-    render();
+  if (stepId === "compass") {
+    resetToDefaultMap();
+    renderForTourStep();
   }
 }
 
@@ -1047,29 +1090,20 @@ function startTutorial(force = false) {
         "quick-actions",
         "menu-handle",
         "side-menu",
-        "route-planner",
+        "locate",
+        "com1-search",
         "indoor-map",
         "floors",
         "compass",
-        "locate",
       ];
 
       const steps = [
-        {
-          popover: {
-            title: "Welcome to NUS Maps",
-            description:
-              "This quick walkthrough shows the main ways to search places, open building floors, and navigate around campus.",
-            side: "over",
-            align: "center",
-          },
-        },
         {
           element: "#searchInput",
           popover: {
             title: "Search anything fast",
             description:
-              "Type a faculty, building, or room here. Press Enter to jump to the best match or click a suggestion.",
+              "Welcome to NUS Maps. Start here by typing a faculty, building, or room, then press Enter or click a suggestion.",
             side: "bottom",
             align: "start",
           },
@@ -1109,22 +1143,33 @@ function startTutorial(force = false) {
           onHighlightStarted: () => prepareTourStep("side-menu"),
         },
         {
-          element: ".routePlannerPanel",
+          element: "#locateButton",
           popover: {
-            title: "Plan an indoor route",
+            title: "Use your location",
             description:
-              "After selecting a destination, enter a source here and choose from suggestions to generate indoor routes.",
-            side: "right",
+              "This returns to the normal campus view after the menu step. Tap here to allow geolocation and anchor the map to your current position.",
+            side: "left",
+            align: "center",
+          },
+          onHighlightStarted: () => prepareTourStep("locate"),
+        },
+        {
+          element: ".searchShell",
+          popover: {
+            title: "Search for COM1",
+            description:
+              "Step 6 uses COM1 as the example. Entering COM1 here zooms the campus map into that building so you can inspect it more closely.",
+            side: "bottom",
             align: "start",
           },
-          onHighlightStarted: () => prepareTourStep("route-planner"),
+          onHighlightStarted: () => prepareTourStep("com1-search"),
         },
         {
           element: "#floorOverlay .floorSheet",
           popover: {
-            title: "View the building floorplan",
+            title: "Open the floorplan",
             description:
-              "Selecting COM1 opens its floor image. Click outside the sheet when you want to return to the campus map.",
+              "From the COM1 zoomed-in view, you can open the indoor floorplan and inspect the current level in detail.",
             side: "left",
             align: "center",
           },
@@ -1135,7 +1180,7 @@ function startTutorial(force = false) {
           popover: {
             title: "Switch floors",
             description:
-              "Use these buttons to move between B1 and upper levels. When a route is active, the buttons also show which floors are on the path.",
+              "These buttons let you move across COM1 floors once you are inside the building view.",
             side: "left",
             align: "start",
           },
@@ -1144,24 +1189,13 @@ function startTutorial(force = false) {
         {
           element: "#compassButton",
           popover: {
-            title: "Reset orientation",
+            title: "Back to the default map",
             description:
-              "The compass snaps the map back to true north, while the dial below it lets you rotate the view manually.",
+              "After the floorplan steps, the tour returns to the default campus map. Use the compass to reset orientation whenever you rotate the view.",
             side: "left",
             align: "center",
           },
           onHighlightStarted: () => prepareTourStep("compass"),
-        },
-        {
-          element: "#locateButton",
-          popover: {
-            title: "Use your location",
-            description:
-              "Tap this button to allow geolocation and anchor the experience to your current position on campus.",
-            side: "left",
-            align: "center",
-          },
-          onHighlightStarted: () => prepareTourStep("locate"),
         },
       ];
 
@@ -2107,12 +2141,7 @@ window.addEventListener("storage", (event) => {
 });
 
 state.camera = constrainCamera(
-  {
-    centerX: MAP.width / 2,
-    centerY: MAP.height / 2,
-    zoom: 0.42,
-    bearing: 0,
-  },
+  DEFAULT_CAMERA,
   { width: window.innerWidth, height: window.innerHeight },
 );
 
