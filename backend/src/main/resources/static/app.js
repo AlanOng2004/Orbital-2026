@@ -1122,13 +1122,14 @@ function startTutorial(force = false) {
           onHighlightStarted: () => prepareTourStep("quick-actions"),
         },
         {
-          element: "#menuHandle",
+          element: "#tourMenuHandleSpotlight",
           popover: {
             title: "Open the side menu",
             description:
               "Use this handle to reveal bookmarks, recent activity, route preferences, and visibility settings.",
-            side: "right",
+            side: "over",
             align: "center",
+            popoverClass: "tourPopover--centered",
           },
           onHighlightStarted: () => prepareTourStep("menu-handle"),
         },
@@ -1150,8 +1151,9 @@ function startTutorial(force = false) {
             title: "Search for COM1",
             description:
               "Use COM1 as the example here. Entering COM1 zooms the campus map into that building so you can inspect it more closely.",
-            side: "bottom",
-            align: "start",
+            side: "over",
+            align: "center",
+            popoverClass: "tourPopover--centered",
           },
           onHighlightStarted: () => prepareTourStep("com1-search"),
         },
@@ -1161,8 +1163,9 @@ function startTutorial(force = false) {
             title: "Open the floorplan",
             description:
               "From the COM1 zoomed-in view, you can open the indoor floorplan and inspect the current level in detail.",
-            side: "left",
+            side: "over",
             align: "center",
+            popoverClass: "tourPopover--centered",
           },
           onHighlightStarted: () => prepareTourStep("indoor-map"),
         },
@@ -1172,8 +1175,9 @@ function startTutorial(force = false) {
             title: "Switch floors",
             description:
               "These buttons let you move across COM1 floors once you are inside the building view.",
-            side: "left",
-            align: "start",
+            side: "over",
+            align: "center",
+            popoverClass: "tourPopover--centered",
           },
           onHighlightStarted: () => prepareTourStep("floors"),
         },
@@ -1183,8 +1187,9 @@ function startTutorial(force = false) {
             title: "Back to the default map",
             description:
               "After the floorplan steps, the tour returns to the default campus map. Use the compass to reset orientation whenever you rotate the view.",
-            side: "left",
+            side: "over",
             align: "center",
+            popoverClass: "tourPopover--centered",
           },
           onHighlightStarted: () => prepareTourStep("compass"),
         },
@@ -1529,6 +1534,18 @@ function render() {
             cameraViewport.y + cameraViewport.height / 2 - 28
           }px;"
           >${state.sideMenuOpen ? "<<" : ">>"}</button>`
+        : ""
+    }
+    ${
+      visibleUi
+        ? `<div
+            id="tourMenuHandleSpotlight"
+            class="tourSpotlightAnchor"
+            aria-hidden="true"
+            style="left:${cameraViewport.outerX}px;top:${
+            cameraViewport.y + cameraViewport.height / 2 - 110
+          }px;width:78px;height:220px;"
+          ></div>`
         : ""
     }
     ${
