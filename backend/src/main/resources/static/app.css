@@ -133,11 +133,16 @@ body {
 }
 
 .tourPopover--centered {
+  position: fixed !important;
+  inset: 50% auto auto 50% !important;
   left: 50% !important;
   top: 50% !important;
   right: auto !important;
   bottom: auto !important;
   transform: translate(-50%, -50%) !important;
+  max-width: min(640px, calc(100vw - 40px)) !important;
+  width: min(640px, calc(100vw - 40px)) !important;
+  z-index: 100000 !important;
 }
 
 .tourPopover--centered .driver-popover-arrow {
@@ -148,7 +153,7 @@ body {
   position: absolute;
   z-index: 70;
   pointer-events: none;
-  opacity: 0;
+  opacity: 0.01;
 }
 
 .resultList {

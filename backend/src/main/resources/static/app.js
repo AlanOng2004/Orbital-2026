@@ -1134,7 +1134,7 @@ function startTutorial(force = false) {
           onHighlightStarted: () => prepareTourStep("menu-handle"),
         },
         {
-          element: ".sideMenu",
+          element: "#tourSideMenuSpotlight",
           popover: {
             title: "Adjust your workspace",
             description:
@@ -1146,7 +1146,7 @@ function startTutorial(force = false) {
           onHighlightStarted: () => prepareTourStep("side-menu"),
         },
         {
-          element: ".searchShell",
+          element: "#tourSearchSpotlight",
           popover: {
             title: "Search for COM1",
             description:
@@ -1158,7 +1158,7 @@ function startTutorial(force = false) {
           onHighlightStarted: () => prepareTourStep("com1-search"),
         },
         {
-          element: "#floorOverlay .floorSheet",
+          element: "#tourFloorplanSpotlight",
           popover: {
             title: "Open the floorplan",
             description:
@@ -1170,7 +1170,7 @@ function startTutorial(force = false) {
           onHighlightStarted: () => prepareTourStep("indoor-map"),
         },
         {
-          element: ".routePlannerFloors",
+          element: "#tourFloorButtonsSpotlight",
           popover: {
             title: "Switch floors",
             description:
@@ -1544,7 +1544,29 @@ function render() {
             aria-hidden="true"
             style="left:${cameraViewport.outerX}px;top:${
             cameraViewport.y + cameraViewport.height / 2 - 110
-          }px;width:78px;height:220px;"
+          }px;width:108px;height:240px;"
+          ></div>`
+        : ""
+    }
+    ${
+      visibleUi
+        ? `<div
+            id="tourSideMenuSpotlight"
+            class="tourSpotlightAnchor"
+            aria-hidden="true"
+            style="left:${cameraViewport.outerX}px;top:${cameraViewport.outerY}px;width:${
+            cameraViewport.menuWidth || SIDE_MENU_WIDTH
+          }px;height:${cameraViewport.outerHeight}px;"
+          ></div>`
+        : ""
+    }
+    ${
+      visibleUi
+        ? `<div
+            id="tourSearchSpotlight"
+            class="tourSpotlightAnchor"
+            aria-hidden="true"
+            style="left:${cameraViewport.x + 18}px;top:${cameraViewport.y + 10}px;width:370px;height:92px;"
           ></div>`
         : ""
     }
@@ -1765,6 +1787,27 @@ function render() {
               </div>
             </div>
           </section>`
+        : ""
+    }
+    ${
+      state.mode === "map"
+        ? `<div
+            id="tourFloorplanSpotlight"
+            class="tourSpotlightAnchor"
+            aria-hidden="true"
+            style="left:${cameraViewport.x + Math.max(120, cameraViewport.width * 0.21)}px;top:${
+            cameraViewport.y + 86
+          }px;width:${Math.min(760, cameraViewport.width * 0.58)}px;height:${Math.min(
+            520,
+            cameraViewport.height * 0.72,
+          )}px;"
+          ></div>
+          <div
+            id="tourFloorButtonsSpotlight"
+            class="tourSpotlightAnchor"
+            aria-hidden="true"
+            style="left:${cameraViewport.x + 18}px;top:${cameraViewport.y + 158}px;width:352px;height:470px;"
+          ></div>`
         : ""
     }
   `;
