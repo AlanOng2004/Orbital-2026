@@ -12,4 +12,5 @@ public interface SSSPService {
     // Clear, Set, Overload (w/o Map) operations
     List<Edge> SSSP(Node source, Node target, Map<Edge.EdgeTag, DoubleUnaryOperator> perms);
     List<Edge> ASTAR(Node source, Node target, Map<Edge.EdgeTag, DoubleUnaryOperator> perms);
+    double calculatePathWeight(List<Edge> path, Map<Edge.EdgeTag, DoubleUnaryOperator> perms);
 }

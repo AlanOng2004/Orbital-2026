@@ -168,6 +168,19 @@ public class SSSPServiceImpl implements SSSPService {
         return null;
     }
 
+    @Override
+    public double calculatePathWeight(List<Edge> path, Map<Edge.EdgeTag, DoubleUnaryOperator> perms) {
+        if (path == null || path.isEmpty()) {
+            return 0.0;
+        }
+
+        Map<Edge.EdgeTag, DoubleUnaryOperator> activePerms = perms == null ? Map.of() : perms;
+        return path.stream()
+                .filter(edge -> edge != null && edge.getWeight() != null)
+                .mapToDouble(edge -> getEffectiveWeight(edge, activePerms))
+                .sum();
+    }
+
     private double getEffectiveWeight(Edge edge, Map<Edge.EdgeTag, DoubleUnaryOperator> perms) {
         double weight = edge.getWeight();
 
