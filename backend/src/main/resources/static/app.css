@@ -929,6 +929,20 @@ body {
   background: #ffffff;
   box-shadow: 0 24px 70px rgba(16, 24, 32, 0.34);
   line-height: 0;
+  touch-action: none;
+  cursor: grab;
+}
+
+.floorViewport:active {
+  cursor: grabbing;
+}
+
+.floorContent {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  transform-origin: center center;
+  will-change: transform;
 }
 
 .floorViewport img {
@@ -963,44 +977,233 @@ body {
 }
 
 @media (max-width: 720px) {
+  .viewer {
+    min-width: 320px;
+  }
+
+  .topChrome {
+    left: 12px !important;
+    top: max(10px, env(safe-area-inset-top)) !important;
+    right: 12px;
+    z-index: 42;
+    width: auto;
+    gap: 8px;
+  }
+
+  .searchShell {
+    width: 100%;
+    height: 44px;
+    padding: 0 10px;
+    gap: 10px;
+    border-radius: 12px;
+    box-sizing: border-box;
+  }
+
+  .searchShell input {
+    font-size: 15px;
+  }
+
+  .tourButton {
+    max-width: 92px;
+    padding: 0 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .resultList {
+    top: 52px;
+    width: 100%;
+    max-height: min(320px, calc(100dvh - 112px));
+    overflow-y: auto;
+    border-radius: 14px;
+  }
+
+  .resultList button {
+    min-height: 54px;
+    padding: 8px 14px;
+    gap: 10px;
+  }
+
+  .resultList button span,
+  .routePlannerSuggestions button span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
   .quickActions {
-    width: min(420px, calc(100vw - 36px));
-    flex-wrap: wrap;
+    width: 100%;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .quickActions::-webkit-scrollbar {
+    display: none;
   }
 
   .quickActions button {
-    flex: 1 1 calc(50% - 8px);
+    flex: 0 0 auto;
+    min-width: auto;
+    min-height: 36px;
+    padding: 0 12px;
+    border-radius: 999px;
+    white-space: nowrap;
   }
 
-  .menuHandle {
-    top: auto;
-    right: 18px;
-    bottom: 244px;
+  .routePlannerPanel {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    z-index: 48;
+    width: auto;
+    max-height: min(48dvh, 430px);
+    padding: 12px;
+    border-radius: 16px;
+    overflow-y: auto;
   }
 
-  .locateButton {
-    right: 28px;
-    bottom: 126px;
+  .routePlannerPanel__title {
+    margin-bottom: 8px;
+    font-size: 12px;
   }
 
-  .rotationDial {
-    width: 86px;
-    height: 86px;
+  .routePlannerField {
+    margin-bottom: 8px;
   }
 
-  .floorOverlay {
-    padding: 96px 18px 20px;
+  .routePlannerField input {
+    height: 42px;
+    font-size: 16px;
+  }
+
+  .routePlannerSuggestions {
+    max-height: 164px;
+    overflow-y: auto;
+  }
+
+  .routePlannerSuggestions button {
+    min-height: 46px;
+    padding: 8px 12px;
+    gap: 10px;
+  }
+
+  .routePlannerGo {
+    width: 100%;
+    height: 42px;
   }
 
   .routePlannerFloors {
     gap: 6px;
+    margin-top: 10px;
+    margin-bottom: 6px;
+  }
+
+  .routePlannerFloors button {
+    flex: 1 1 54px;
+    min-width: 52px;
+    height: 36px;
+    box-shadow: none;
+  }
+
+  .routePlannerResults {
+    margin-top: 12px;
+  }
+
+  .routePlannerDirections {
+    height: min(190px, 26dvh);
+    min-height: 150px;
+    max-height: 190px;
+  }
+
+  .sideMenu {
+    left: 0 !important;
+    top: 0 !important;
+    width: min(88vw, 340px) !important;
+    height: 100dvh !important;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(18px, env(safe-area-inset-bottom));
+    z-index: 55;
+  }
+
+  .menuHandle {
+    left: 0 !important;
+    top: auto !important;
+    right: auto;
+    bottom: max(104px, calc(env(safe-area-inset-bottom) + 88px));
+    z-index: 58;
+    width: 42px;
+    min-width: 42px;
+    height: 52px;
+  }
+
+  .viewer--menu-open .menuHandle {
+    left: min(88vw, 340px) !important;
+  }
+
+  .locateButton {
+    left: auto !important;
+    top: auto !important;
+    right: 16px;
+    bottom: max(82px, calc(env(safe-area-inset-bottom) + 70px));
+    z-index: 44;
+    width: 42px;
+    height: 42px;
+  }
+
+  .compassButton {
+    left: auto !important;
+    top: calc(max(10px, env(safe-area-inset-top)) + 58px) !important;
+    right: 16px;
+    z-index: 44;
+  }
+
+  .rotationDial {
+    left: auto !important;
+    top: auto !important;
+    right: 12px;
+    bottom: max(132px, calc(env(safe-area-inset-bottom) + 120px));
+    z-index: 44;
+    width: 64px;
+    height: 64px;
+  }
+
+  .torusRing {
+    width: 44px;
+    height: 44px;
+  }
+
+  .scaleOverlay,
+  .legendOverlay {
+    display: none;
+  }
+
+  .floorOverlay {
+    padding: 116px 12px calc(min(48dvh, 430px) + 30px);
+    align-items: center;
   }
 
   .floorSheet {
-    width: calc(100vw - 36px);
+    width: 100%;
+    max-height: 100%;
+    padding-top: 0;
+    transform: none;
   }
 
   .floorViewport img {
-    width: calc(100vw - 98px);
+    width: min(calc(100vw - 24px), 100%);
+    max-height: calc(100dvh - 158px);
+  }
+
+  .roomHighlight {
+    border-width: 3px;
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.65);
+  }
+
+  .uiHiddenPrompt {
+    width: calc(100vw - 32px);
+    box-sizing: border-box;
+    text-align: center;
   }
 }
