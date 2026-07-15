@@ -223,6 +223,12 @@ const state = {
   locationStatus: "disabled",
   drag: null,
   dialDrag: null,
+  floorView: {
+    scale: 1,
+    x: 0,
+    y: 0,
+  },
+  floorGesture: null,
 };
 
 function normalize(value) {
@@ -414,7 +420,53 @@ function openSelectedRouteFloor(route) {
   if (firstFloor) {
     state.activeFloor = firstFloor;
   }
+  resetFloorView();
   state.mode = "map";
+}
+
+function resetFloorView() {
+  state.floorView = { scale: 1, x: 0, y: 0 };
+  state.floorGesture = null;
+}
+
+function clampFloorView(view, floorViewport) {
+  const scale = Math.min(4, Math.max(1, view.scale));
+  const rect = floorViewport?.getBoundingClientRect();
+  if (!rect) {
+    return { scale, x: view.x, y: view.y };
+  }
+
+  const maxX = Math.max(0, (rect.width * (scale - 1)) / 2);
+  const maxY = Math.max(0, (rect.height * (scale - 1)) / 2);
+  return {
+    scale,
+    x: Math.min(maxX, Math.max(-maxX, view.x)),
+    y: Math.min(maxY, Math.max(-maxY, view.y)),
+  };
+}
+
+function zoomFloorViewAt(nextScale, point, floorViewport) {
+  const rect = floorViewport.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  const current = state.floorView;
+  const boundedScale = Math.min(4, Math.max(1, nextScale));
+  const localX = (point.x - centerX - current.x) / current.scale;
+  const localY = (point.y - centerY - current.y) / current.scale;
+  state.floorView = clampFloorView(
+    {
+      scale: boundedScale,
+      x: point.x - centerX - localX * boundedScale,
+      y: point.y - centerY - localY * boundedScale,
+    },
+    floorViewport,
+  );
+}
+
+function applyFloorView(floorContent) {
+  if (!floorContent) return;
+  const { scale, x, y } = state.floorView;
+  floorContent.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
 }
 
 function toDynamicSearchItem(node) {
@@ -832,6 +884,7 @@ function selectResult(item) {
   const buildingItem = resolvedItem.type === "room"
     ? SEARCH_ITEMS.find((entry) => entry.id === resolvedItem.buildingId)
     : resolvedItem;
+  resetFloorView();
   state.activeResult = buildingItem || resolvedItem;
   state.query = getDisplayLabel(item);
   state.searchResults = [];
@@ -1028,6 +1081,7 @@ function snapshotTourState() {
       dstSuggestions: [...state.routePlanner.dstSuggestions],
     },
     hideOptions: { ...state.hideOptions },
+    floorView: { ...state.floorView },
   };
 }
 
@@ -1049,6 +1103,8 @@ function restoreTourState(snapshot) {
     dstSuggestions: [...snapshot.routePlanner.dstSuggestions],
   };
   state.hideOptions = { ...snapshot.hideOptions };
+  state.floorView = snapshot.floorView ? { ...snapshot.floorView } : { scale: 1, x: 0, y: 0 };
+  state.floorGesture = null;
 }
 
 function resetRoutePlannerState() {
@@ -1081,6 +1137,7 @@ function resetToDefaultMap() {
   state.searchResults = [];
   state.searchCommitted = false;
   state.expandedMenus = {};
+  resetFloorView();
   resetRoutePlannerState();
   setCamera(DEFAULT_CAMERA);
 }
@@ -1808,6 +1865,10 @@ function render() {
           >
             <div class="floorSheet">
               <div class="floorViewport">
+                <div
+                  class="floorContent"
+                  style="transform:translate(${state.floorView.x}px, ${state.floorView.y}px) scale(${state.floorView.scale});"
+                >
                 <img src="${activeFloorData.img}" draggable="false" alt="" />
                 ${
                   showActiveRoomHighlight
@@ -1918,6 +1979,7 @@ function render() {
                       </svg>`
                     : ""
                 }
+                </div>
               </div>
             </div>
           </section>`
@@ -2014,6 +2076,8 @@ function bindEvents(root, cameraViewport, visibleCamera) {
   const mapStage = root.querySelector(".mapStage");
   const floorOverlay = root.querySelector("#floorOverlay");
   const floorSheet = root.querySelector(".floorSheet");
+  const floorViewport = root.querySelector(".floorViewport");
+  const floorContent = root.querySelector(".floorContent");
   const searchInput = root.querySelector("#searchInput");
   const routeSrcInput = root.querySelector("#routeSrcInput");
   const routeDstInput = root.querySelector("#routeDstInput");
@@ -2164,6 +2228,7 @@ function bindEvents(root, cameraViewport, visibleCamera) {
       } else {
         state.activeFloor = requestedFloor;
       }
+      resetFloorView();
       render();
     });
   });
@@ -2304,12 +2369,138 @@ function bindEvents(root, cameraViewport, visibleCamera) {
   if (floorOverlay) {
     floorOverlay.addEventListener("click", () => {
       state.mode = "home";
+      resetFloorView();
       render();
     });
   }
 
   if (floorSheet) {
     floorSheet.addEventListener("click", (event) => event.stopPropagation());
+  }
+
+  if (floorViewport && floorContent) {
+    const floorPointers = new Map();
+    const pointerList = () => Array.from(floorPointers.values());
+    const midpoint = (left, right) => ({
+      x: (left.x + right.x) / 2,
+      y: (left.y + right.y) / 2,
+    });
+    const distance = (left, right) => Math.hypot(left.x - right.x, left.y - right.y);
+    const startPanGesture = (point) => {
+      state.floorGesture = {
+        type: "pan",
+        point,
+        view: { ...state.floorView },
+      };
+    };
+    const startPinchGesture = (points) => {
+      const [left, right] = points;
+      state.floorGesture = {
+        type: "pinch",
+        distance: Math.max(1, distance(left, right)),
+        midpoint: midpoint(left, right),
+        view: { ...state.floorView },
+      };
+    };
+
+    floorViewport.addEventListener("pointerdown", (event) => {
+      if (event.button !== undefined && event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      floorViewport.setPointerCapture(event.pointerId);
+      floorPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      const points = pointerList();
+      if (points.length >= 2) {
+        startPinchGesture(points);
+      } else {
+        startPanGesture(points[0]);
+      }
+    });
+
+    floorViewport.addEventListener("pointermove", (event) => {
+      if (!floorPointers.has(event.pointerId)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      floorPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      const points = pointerList();
+
+      if (points.length >= 2) {
+        if (!state.floorGesture || state.floorGesture.type !== "pinch") {
+          startPinchGesture(points);
+        }
+        const gesture = state.floorGesture;
+        const currentMidpoint = midpoint(points[0], points[1]);
+        const nextScale = gesture.view.scale * (distance(points[0], points[1]) / gesture.distance);
+        const boundedScale = Math.min(4, Math.max(1, nextScale));
+        const rect = floorViewport.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const localX = (gesture.midpoint.x - centerX - gesture.view.x) / gesture.view.scale;
+        const localY = (gesture.midpoint.y - centerY - gesture.view.y) / gesture.view.scale;
+        state.floorView = clampFloorView(
+          {
+            scale: boundedScale,
+            x: currentMidpoint.x - centerX - localX * boundedScale,
+            y: currentMidpoint.y - centerY - localY * boundedScale,
+          },
+          floorViewport,
+        );
+      } else if (points.length === 1) {
+        if (!state.floorGesture || state.floorGesture.type !== "pan") {
+          startPanGesture(points[0]);
+        }
+        const gesture = state.floorGesture;
+        state.floorView = clampFloorView(
+          {
+            ...gesture.view,
+            x: gesture.view.x + points[0].x - gesture.point.x,
+            y: gesture.view.y + points[0].y - gesture.point.y,
+          },
+          floorViewport,
+        );
+      }
+
+      applyFloorView(floorContent);
+    });
+
+    const endFloorGesture = (event) => {
+      if (!floorPointers.has(event.pointerId)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      floorPointers.delete(event.pointerId);
+      const points = pointerList();
+      if (points.length >= 2) {
+        startPinchGesture(points);
+      } else if (points.length === 1) {
+        startPanGesture(points[0]);
+      } else {
+        state.floorGesture = null;
+      }
+    };
+
+    floorViewport.addEventListener("pointerup", endFloorGesture);
+    floorViewport.addEventListener("pointercancel", endFloorGesture);
+    floorViewport.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const factor = event.deltaY < 0 ? 1.14 : 0.88;
+        zoomFloorViewAt(
+          state.floorView.scale * factor,
+          { x: event.clientX, y: event.clientY },
+          floorViewport,
+        );
+        applyFloorView(floorContent);
+      },
+      { passive: false },
+    );
+    floorViewport.addEventListener("dblclick", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      resetFloorView();
+      applyFloorView(floorContent);
+    });
   }
 }
 
