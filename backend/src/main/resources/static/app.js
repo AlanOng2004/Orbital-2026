@@ -326,6 +326,15 @@ function findBuildingItemForName(buildingName) {
   );
 }
 
+function findStaticSearchItem(item) {
+  if (!item) return null;
+  const terms = getSearchTerms(item).map((value) => normalize(String(value)));
+  return SEARCH_ITEMS.find((entry) => {
+    if (entry.type !== item.type) return false;
+    return getSearchTerms(entry).some((value) => terms.includes(normalize(String(value))));
+  }) || null;
+}
+
 function getBuildingQueryForItem(item) {
   if (!item) return null;
   if (item.type === "building") return item.label;
@@ -818,10 +827,12 @@ function setCameraFromUpdater(updater, elastic = false) {
 }
 
 function selectResult(item) {
-  const buildingItem = item.type === "room"
-    ? SEARCH_ITEMS.find((entry) => entry.id === item.buildingId)
-    : item;
-  state.activeResult = buildingItem || item;
+  const staticMatch = findStaticSearchItem(item);
+  const resolvedItem = staticMatch ? { ...staticMatch, ...item, box: item.box || staticMatch.box } : item;
+  const buildingItem = resolvedItem.type === "room"
+    ? SEARCH_ITEMS.find((entry) => entry.id === resolvedItem.buildingId)
+    : resolvedItem;
+  state.activeResult = buildingItem || resolvedItem;
   state.query = getDisplayLabel(item);
   state.searchResults = [];
   state.searchCommitted = true;
@@ -832,45 +843,45 @@ function selectResult(item) {
     srcSuggestions: [],
     srcRequestId: 0,
     srcSelection: null,
-    dst: getDisplayLabel(item),
+    dst: getDisplayLabel(resolvedItem),
     dstConfirmed: true,
     dstSuggestions: [],
     dstRequestId: 0,
-    dstSelection: item,
+    dstSelection: resolvedItem,
     route: null,
     loading: false,
     error: "",
   };
 
-  if (item.type === "faculty") {
+  if (resolvedItem.type === "faculty") {
     state.mode = "home";
     state.activeRoom = null;
-    if (item.box) {
-      setCamera(cameraForBox(item.box, getBoundsViewport(), getVisibleCamera().bearing, 120));
+    if (resolvedItem.box) {
+      setCamera(cameraForBox(resolvedItem.box, getBoundsViewport(), getVisibleCamera().bearing, 120));
     }
     render();
     return;
   }
 
-  if (item.type === "building") {
+  if (resolvedItem.type === "building") {
     state.mode = "home";
     state.activeRoom = null;
-    state.activeFloor = item.floor || "L1";
-    if (item.box) {
-      setCamera(cameraForBox(item.box, getBoundsViewport(), 0, 180));
+    state.activeFloor = resolvedItem.floor || "L1";
+    if (resolvedItem.box) {
+      setCamera(cameraForBox(resolvedItem.box, getBoundsViewport(), 0, 180));
     }
     render();
     return;
   }
 
   state.mode = "map";
-  state.activeFloor = item.floor || "L1";
-  state.activeRoom = item;
-  const building = SEARCH_ITEMS.find((candidate) => candidate.id === item.buildingId);
+  state.activeFloor = resolvedItem.floor || "L1";
+  state.activeRoom = resolvedItem;
+  const building = SEARCH_ITEMS.find((candidate) => candidate.id === resolvedItem.buildingId);
   if (building && building.box) {
     setCamera(cameraForBox(building.box, getBoundsViewport(), 0, 180));
-  } else if (item.box) {
-    setCamera(cameraForBox(item.box, getBoundsViewport(), 0, 180));
+  } else if (resolvedItem.box) {
+    setCamera(cameraForBox(resolvedItem.box, getBoundsViewport(), 0, 180));
   }
   render();
 }
@@ -1377,6 +1388,11 @@ function render() {
   const floorRouteNodes = state.mode === "map" ? getRouteNodesForFloor(selectedRoute, state.activeFloor) : [];
   const floorRouteStartNode = floorRouteNodes[0] || null;
   const floorRouteEndNode = floorRouteNodes[floorRouteNodes.length - 1] || null;
+  const showActiveRoomHighlight =
+    !!state.activeRoom &&
+    state.activeRoom.floor === state.activeFloor &&
+    !state.routePlanner.loading &&
+    !selectedRoute;
   const upcomingRouteFloor = getUpcomingRouteFloor(selectedRoute, state.activeFloor);
   const transitionNodeIsStair = isTransitionNode(floorRouteEndNode, selectedRoute, state.activeFloor);
   const activeFloorData =
@@ -1385,7 +1401,8 @@ function render() {
       : COM1_FLOORS.find((floor) => floor.id === state.activeFloor) || COM1_FLOORS[1];
   const account = getAccountState();
   const visibleUi = !state.hideOptions.ui;
-  const showRoutePlanner = !!state.activeResult && visibleCamera.zoom >= 0.85;
+  const showRoutePlanner =
+    !!state.activeResult && (state.mode === "map" || visibleCamera.zoom >= 0.85);
   const floorShift = visibleUi && showRoutePlanner && state.windowSize.width > 960 ? 210 : 0;
   const bearing = normalizeBearing(visibleCamera.bearing);
   const mapTransform =
@@ -1793,8 +1810,7 @@ function render() {
               <div class="floorViewport">
                 <img src="${activeFloorData.img}" draggable="false" alt="" />
                 ${
-                  state.activeRoom &&
-                  state.activeRoom.floor === state.activeFloor
+                  showActiveRoomHighlight
                     ? state.activeRoom.roomBox
                       ? `<div
                           class="roomHighlight"
