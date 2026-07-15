@@ -7,15 +7,13 @@ import com.orbital.nusmaps.model.Edge;
 import com.orbital.nusmaps.model.Node;
 import com.orbital.nusmaps.model.NodeAlias;
 import com.orbital.nusmaps.repository.NodeRepository;
+import com.orbital.nusmaps.service.RouteSearchIndexService;
 import com.orbital.nusmaps.service.SSSPService;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.DoubleUnaryOperator;
-import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,10 +33,16 @@ public class RouteController {
     private static final double TURN_THRESHOLD_DEGREES = 30.0;
 
     private final NodeRepository nodeRepository;
+    private final RouteSearchIndexService routeSearchIndexService;
     private final SSSPService ssspService;
 
-    public RouteController(NodeRepository nodeRepository, SSSPService ssspService) {
+    public RouteController(
+            NodeRepository nodeRepository,
+            RouteSearchIndexService routeSearchIndexService,
+            SSSPService ssspService
+    ) {
         this.nodeRepository = nodeRepository;
+        this.routeSearchIndexService = routeSearchIndexService;
         this.ssspService = ssspService;
     }
 
@@ -64,12 +68,7 @@ public class RouteController {
                 ? null
                 : buildingQuery.trim();
 
-        return nodeRepository.searchRouteNodes(trimmedQuery, trimmedBuildingQuery).stream()
-                .filter(this::isSearchableNode)
-                .sorted((left, right) -> compareSearchPriority(left, right, trimmedQuery))
-                .limit(12)
-                .map(this::toRouteNodeOption)
-                .toList();
+        return routeSearchIndexService.searchRouteNodes(trimmedQuery, trimmedBuildingQuery);
     }
 
     @PostMapping("/same-building")
@@ -352,49 +351,6 @@ public class RouteController {
                 && node.getYCoordinate() != null
                 && node.getNodeType() != Node.NodeType.Corridor
                 && node.getNodeType() != Node.NodeType.Junction;
-    }
-
-    private int compareSearchPriority(Node left, Node right, String query) {
-        String normalizedQuery = query.toLowerCase();
-        int leftScore = getSearchScore(left, normalizedQuery);
-        int rightScore = getSearchScore(right, normalizedQuery);
-        if (leftScore != rightScore) {
-            return Integer.compare(leftScore, rightScore);
-        }
-
-        boolean leftIsRoom = left.getNodeType() == Node.NodeType.Room;
-        boolean rightIsRoom = right.getNodeType() == Node.NodeType.Room;
-        if (leftIsRoom != rightIsRoom) {
-            return leftIsRoom ? -1 : 1;
-        }
-
-        return left.getNodeName().compareToIgnoreCase(right.getNodeName());
-    }
-
-    private int getSearchScore(Node node, String normalizedQuery) {
-        List<String> candidates = new ArrayList<>();
-        candidates.add(node.getNodeName());
-        candidates.add(node.getDualName());
-        for (NodeAlias alias : node.getAliases()) {
-            candidates.add(alias.getNodeAlias());
-        }
-
-        int bestScore = 3;
-        for (String candidate : candidates) {
-            if (candidate == null || candidate.isBlank()) {
-                continue;
-            }
-
-            String normalizedCandidate = candidate.toLowerCase();
-            if (normalizedCandidate.equals(normalizedQuery)) {
-                bestScore = Math.min(bestScore, 0);
-            } else if (normalizedCandidate.startsWith(normalizedQuery)) {
-                bestScore = Math.min(bestScore, 1);
-            } else if (normalizedCandidate.contains(normalizedQuery)) {
-                bestScore = Math.min(bestScore, 2);
-            }
-        }
-        return bestScore;
     }
 
     private String formatSecondaryLabel(Node node) {

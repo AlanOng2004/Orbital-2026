@@ -15,6 +15,7 @@ import com.orbital.nusmaps.model.Edge;
 import com.orbital.nusmaps.model.Floorplan;
 import com.orbital.nusmaps.model.Node;
 import com.orbital.nusmaps.repository.NodeRepository;
+import com.orbital.nusmaps.service.RouteSearchIndexService;
 import com.orbital.nusmaps.service.SSSPService;
 import java.util.List;
 import java.util.Optional;
@@ -33,13 +34,16 @@ class RouteControllerTest {
     private NodeRepository nodeRepository;
 
     @Mock
+    private RouteSearchIndexService routeSearchIndexService;
+
+    @Mock
     private SSSPService ssspService;
 
     private RouteController routeController;
 
     @BeforeEach
     void setUp() {
-        routeController = new RouteController(nodeRepository, ssspService);
+        routeController = new RouteController(nodeRepository, routeSearchIndexService, ssspService);
     }
 
     @Test
@@ -73,7 +77,12 @@ class RouteControllerTest {
         Node prefixToilet = TestDataFactory.node(2L, "SR1 Toilet", null, Node.NodeType.Toilet, floorplan, 2, 2);
         Node containsRoom = TestDataFactory.node(3L, "Open Space", "SR1 Lounge", Node.NodeType.Room, floorplan, 3, 3);
 
-        when(nodeRepository.searchRouteNodes("SR1", "COM1")).thenReturn(List.of(containsRoom, prefixToilet, exactRoom));
+        when(routeSearchIndexService.searchRouteNodes("SR1", "COM1"))
+                .thenReturn(List.of(
+                        toRouteNodeOption(exactRoom),
+                        toRouteNodeOption(containsRoom),
+                        toRouteNodeOption(prefixToilet)
+                ));
 
         List<RouteNodeOptionResponse> results = routeController.searchRouteNodes("SR1", "COM1");
 
@@ -173,5 +182,22 @@ class RouteControllerTest {
 
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
         assertEquals("Only same-building routing is supported right now.", ex.getReason());
+    }
+
+    private static RouteNodeOptionResponse toRouteNodeOption(Node node) {
+        return new RouteNodeOptionResponse(
+                node.getNodeId(),
+                node.getNodeName(),
+                node.getDualName(),
+                node.getFloorplan().getBuilding().getBuildingName(),
+                node.getFloorplan().getBuilding().getBuildingName() + " L" + node.getFloorplan().getLevel()
+                        + " • " + node.getNodeType().name(),
+                node.getNodeType().name(),
+                node.getFloorplan().getLevel(),
+                node.getFloorplan().getImageUrl(),
+                node.getXCoordinate(),
+                node.getYCoordinate(),
+                List.of()
+        );
     }
 }

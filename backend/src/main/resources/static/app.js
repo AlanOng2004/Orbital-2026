@@ -259,6 +259,52 @@ function getDisplayLabel(item) {
   return item.displayLabel || item.label;
 }
 
+function parsePolygonBox(polygon) {
+  if (!polygon || typeof polygon !== "string") return null;
+  const numbers = polygon
+    .match(/-?\d+(?:\.\d+)?/g)
+    ?.map(Number)
+    .filter(Number.isFinite);
+
+  if (!numbers || numbers.length < 4) return null;
+
+  const points = [];
+  for (let index = 0; index + 1 < numbers.length; index += 2) {
+    points.push({ x: numbers[index], y: numbers[index + 1] });
+  }
+
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minY) || !Number.isFinite(maxY)) {
+    return null;
+  }
+
+  return {
+    x: minX,
+    y: minY,
+    width: Math.max(24, maxX - minX),
+    height: Math.max(24, maxY - minY),
+  };
+}
+
+function floorDataFromResult(result) {
+  const floor = floorIdFromData(result.floorLevel, result.floorImageUrl);
+  const knownFloor = COM1_FLOORS.find(
+    (entry) => entry.id === floor || entry.img === result.floorImageUrl || result.floorImageUrl?.endsWith(entry.img),
+  );
+
+  return {
+    id: floor,
+    img: result.floorImageUrl || knownFloor?.img || COM1_FLOORS[1].img,
+    width: knownFloor?.width || COM1_FLOORS[1].width,
+    height: knownFloor?.height || COM1_FLOORS[1].height,
+  };
+}
+
 function getSearchTerms(item) {
   return uniqueBy(
     [
@@ -280,11 +326,20 @@ function findBuildingItemForName(buildingName) {
   );
 }
 
+function findStaticSearchItem(item) {
+  if (!item) return null;
+  const terms = getSearchTerms(item).map((value) => normalize(String(value)));
+  return SEARCH_ITEMS.find((entry) => {
+    if (entry.type !== item.type) return false;
+    return getSearchTerms(entry).some((value) => terms.includes(normalize(String(value))));
+  }) || null;
+}
+
 function getBuildingQueryForItem(item) {
   if (!item) return null;
   if (item.type === "building") return item.label;
   if (item.buildingId) {
-    return SEARCH_ITEMS.find((entry) => entry.id === item.buildingId)?.label || null;
+    return SEARCH_ITEMS.find((entry) => entry.id === item.buildingId)?.label || item.backendResult?.buildingName || null;
   }
   return null;
 }
@@ -391,6 +446,71 @@ function toDynamicSearchItem(node) {
   };
 }
 
+function toTypedSearchItem(result) {
+  const type = String(result.type || "").toUpperCase();
+  const box = parsePolygonBox(result.polygon);
+
+  if (type === "FACULTY") {
+    return {
+      id: `faculty-${result.id}`,
+      type: "faculty",
+      label: result.label,
+      secondaryLabel: result.secondaryLabel || "Faculty",
+      aliases: result.aliases || [],
+      box,
+      backendResult: result,
+    };
+  }
+
+  if (type === "BUILDING") {
+    return {
+      id: `building-${result.id}`,
+      type: "building",
+      label: result.label,
+      secondaryLabel: result.secondaryLabel || "Building",
+      aliases: result.aliases || [],
+      box,
+      floor: "L1",
+      backendResult: result,
+    };
+  }
+
+  if (type === "NODE") {
+    const displayLabel = result.dualLabel || result.label;
+    const secondaryParts = [];
+    if (result.label && result.dualLabel && result.label !== result.dualLabel) {
+      secondaryParts.push(result.label);
+    }
+    if (result.secondaryLabel) {
+      secondaryParts.push(result.secondaryLabel);
+    }
+
+    const floorData = floorDataFromResult(result);
+    const roomBox = parsePolygonBox(result.polygon);
+
+    return {
+      id: `node-${result.nodeId}`,
+      type: "room",
+      label: result.label,
+      displayLabel,
+      secondaryLabel: secondaryParts.join(" • "),
+      aliases: uniqueBy(
+        [result.dualLabel, ...(result.aliases || [])].filter(Boolean),
+        (value) => normalize(String(value)),
+      ),
+      buildingId: result.buildingId ? `building-${result.buildingId}` : null,
+      floor: floorData.id,
+      floorData,
+      roomBox,
+      nodePoint: Number.isFinite(result.x) && Number.isFinite(result.y) ? { x: result.x, y: result.y } : null,
+      routeNodeId: result.nodeId,
+      backendResult: result,
+    };
+  }
+
+  return null;
+}
+
 function rankSearchItem(item, term) {
   const searchTerms = getSearchTerms(item).map(normalize);
   const displayLabel = normalize(getDisplayLabel(item));
@@ -430,6 +550,16 @@ async function fetchRouteNodeSearch(query, buildingQuery) {
   return Array.isArray(payload) ? payload.map(toDynamicSearchItem) : [];
 }
 
+async function fetchGeneralSearch(query) {
+  const params = new URLSearchParams({ query });
+  const response = await fetch(`/api/search?${params.toString()}`);
+  const payload = await response.json().catch(() => []);
+  if (!response.ok) {
+    throw new Error(payload?.error || payload?.message || "Unable to search.");
+  }
+  return Array.isArray(payload) ? payload.map(toTypedSearchItem).filter(Boolean) : [];
+}
+
 function refreshSearchResults() {
   const term = normalize(state.query);
   const staticMatches =
@@ -449,7 +579,7 @@ function refreshSearchResults() {
   state.searchResults = staticMatches.slice(0, 7);
   render();
 
-  fetchRouteNodeSearch(state.query.trim())
+  fetchGeneralSearch(state.query.trim())
     .then((dynamicItems) => {
       if (requestId !== state.searchRequestId) return;
       state.searchResults = mergeSearchResults(staticMatches, dynamicItems, term, 7);
@@ -697,8 +827,12 @@ function setCameraFromUpdater(updater, elastic = false) {
 }
 
 function selectResult(item) {
-  const buildingItem = item.type === "room" ? SEARCH_ITEMS.find((entry) => entry.id === item.buildingId) : item;
-  state.activeResult = buildingItem || item;
+  const staticMatch = findStaticSearchItem(item);
+  const resolvedItem = staticMatch ? { ...staticMatch, ...item, box: item.box || staticMatch.box } : item;
+  const buildingItem = resolvedItem.type === "room"
+    ? SEARCH_ITEMS.find((entry) => entry.id === resolvedItem.buildingId)
+    : resolvedItem;
+  state.activeResult = buildingItem || resolvedItem;
   state.query = getDisplayLabel(item);
   state.searchResults = [];
   state.searchCommitted = true;
@@ -709,39 +843,45 @@ function selectResult(item) {
     srcSuggestions: [],
     srcRequestId: 0,
     srcSelection: null,
-    dst: getDisplayLabel(item),
+    dst: getDisplayLabel(resolvedItem),
     dstConfirmed: true,
     dstSuggestions: [],
     dstRequestId: 0,
-    dstSelection: item,
+    dstSelection: resolvedItem,
     route: null,
     loading: false,
     error: "",
   };
 
-  if (item.type === "faculty") {
+  if (resolvedItem.type === "faculty") {
     state.mode = "home";
     state.activeRoom = null;
-    setCamera(cameraForBox(item.box, getBoundsViewport(), getVisibleCamera().bearing, 120));
+    if (resolvedItem.box) {
+      setCamera(cameraForBox(resolvedItem.box, getBoundsViewport(), getVisibleCamera().bearing, 120));
+    }
     render();
     return;
   }
 
-  if (item.type === "building") {
+  if (resolvedItem.type === "building") {
     state.mode = "home";
     state.activeRoom = null;
-    state.activeFloor = item.floor || "L1";
-    setCamera(cameraForBox(item.box, getBoundsViewport(), 0, 180));
+    state.activeFloor = resolvedItem.floor || "L1";
+    if (resolvedItem.box) {
+      setCamera(cameraForBox(resolvedItem.box, getBoundsViewport(), 0, 180));
+    }
     render();
     return;
   }
 
-  state.mode = "home";
-  state.activeFloor = item.floor || "L1";
-  state.activeRoom = item;
-  const building = SEARCH_ITEMS.find((candidate) => candidate.id === item.buildingId);
+  state.mode = "map";
+  state.activeFloor = resolvedItem.floor || "L1";
+  state.activeRoom = resolvedItem;
+  const building = SEARCH_ITEMS.find((candidate) => candidate.id === resolvedItem.buildingId);
   if (building && building.box) {
     setCamera(cameraForBox(building.box, getBoundsViewport(), 0, 180));
+  } else if (resolvedItem.box) {
+    setCamera(cameraForBox(resolvedItem.box, getBoundsViewport(), 0, 180));
   }
   render();
 }
@@ -1248,13 +1388,21 @@ function render() {
   const floorRouteNodes = state.mode === "map" ? getRouteNodesForFloor(selectedRoute, state.activeFloor) : [];
   const floorRouteStartNode = floorRouteNodes[0] || null;
   const floorRouteEndNode = floorRouteNodes[floorRouteNodes.length - 1] || null;
+  const showActiveRoomHighlight =
+    !!state.activeRoom &&
+    state.activeRoom.floor === state.activeFloor &&
+    !state.routePlanner.loading &&
+    !selectedRoute;
   const upcomingRouteFloor = getUpcomingRouteFloor(selectedRoute, state.activeFloor);
   const transitionNodeIsStair = isTransitionNode(floorRouteEndNode, selectedRoute, state.activeFloor);
   const activeFloorData =
-    COM1_FLOORS.find((floor) => floor.id === state.activeFloor) || COM1_FLOORS[1];
+    state.activeRoom?.floorData && state.activeRoom.floor === state.activeFloor
+      ? state.activeRoom.floorData
+      : COM1_FLOORS.find((floor) => floor.id === state.activeFloor) || COM1_FLOORS[1];
   const account = getAccountState();
   const visibleUi = !state.hideOptions.ui;
-  const showRoutePlanner = !!state.activeResult && visibleCamera.zoom >= 0.85;
+  const showRoutePlanner =
+    !!state.activeResult && (state.mode === "map" || visibleCamera.zoom >= 0.85);
   const floorShift = visibleUi && showRoutePlanner && state.windowSize.width > 960 ? 210 : 0;
   const bearing = normalizeBearing(visibleCamera.bearing);
   const mapTransform =
@@ -1662,8 +1810,7 @@ function render() {
               <div class="floorViewport">
                 <img src="${activeFloorData.img}" draggable="false" alt="" />
                 ${
-                  state.activeRoom &&
-                  state.activeRoom.floor === state.activeFloor
+                  showActiveRoomHighlight
                     ? state.activeRoom.roomBox
                       ? `<div
                           class="roomHighlight"

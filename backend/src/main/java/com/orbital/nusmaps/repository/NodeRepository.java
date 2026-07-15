@@ -40,6 +40,18 @@ public interface NodeRepository extends JpaRepository<Node, Long> {
         left join fetch n.aliases na
         join fetch n.floorplan fp
         join fetch fp.building b
+        left join fetch b.faculty bf
+        left join fetch n.faculty f
+        order by fp.level asc, n.nodeName asc
+        """)
+    List<Node> findAllRouteSearchNodes();
+
+    @Query("""
+        select distinct n
+        from Node n
+        left join fetch n.aliases na
+        join fetch n.floorplan fp
+        join fetch fp.building b
         left join b.aliases ba
         where (
                 lower(n.nodeName) like lower(concat('%', :query, '%'))

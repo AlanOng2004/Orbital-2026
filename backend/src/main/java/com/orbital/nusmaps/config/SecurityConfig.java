@@ -38,6 +38,7 @@ public class SecurityConfig {
                     "/img/**",
                     "/h2-console/**",
                     "/api/auth/**",
+                    "/api/search/**",
                     "/api/routes/**",
                     "/error"
                 ).permitAll()
