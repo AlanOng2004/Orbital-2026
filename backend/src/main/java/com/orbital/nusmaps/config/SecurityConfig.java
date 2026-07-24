@@ -41,6 +41,7 @@ public class SecurityConfig {
                     "/img/**",
                     "/h2-console/**",
                     "/api/auth/**",
+                    "/api/annotator/floorplans",
                     "/api/search/**",
                     "/api/routes/**",
                     "/error"

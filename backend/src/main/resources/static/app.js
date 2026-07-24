@@ -1615,6 +1615,7 @@ function render() {
           style="left:${-MAP.cropX}px;top:${-MAP.cropY}px;width:${MAP.sourceWidth}px;height:${MAP.sourceHeight}px;"
         />
         <div class="campusLegendMask" aria-hidden="true"></div>
+        <div class="campusScaleMask" aria-hidden="true"></div>
         ${
           state.activeResult && state.activeResult.box && state.mode === "home"
             ? `<div

@@ -1,7 +1,33 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import './App.css';
 
 const COORDINATE_NODE_TYPE = 'Coordinate';
+const FALLBACK_FLOORPLANS = [
+  {
+    floorplanId: 1,
+    buildingName: 'COM1',
+    level: -1,
+    imageUrl: '/img/COMBLK1_B1.jpg',
+  },
+  {
+    floorplanId: 2,
+    buildingName: 'COM1',
+    level: 1,
+    imageUrl: '/img/COMBLK1_01.jpg',
+  },
+  {
+    floorplanId: 3,
+    buildingName: 'COM1',
+    level: 2,
+    imageUrl: '/img/COMBLK1_02.jpg',
+  },
+  {
+    floorplanId: 4,
+    buildingName: 'COM1',
+    level: 3,
+    imageUrl: '/img/COMBLK1_03.jpg',
+  },
+];
 
 const NODE_TYPES = [
   'Food',
@@ -387,11 +413,30 @@ function getStoredSession() {
   }
 }
 
+function resolveFloorplanImageUrl(imageUrl) {
+  const normalized = String(imageUrl || '').trim();
+  if (!normalized) return null;
+  if (/^(?:[a-z]+:|\/)/i.test(normalized)) return normalized;
+  return `/${normalized.replace(/^\.?\//, '')}`;
+}
+
+function formatFloorplanLabel(floorplan) {
+  const level = Number(floorplan.level);
+  const levelLabel = level < 0
+    ? `Basement ${Math.abs(level)}`
+    : level === 0
+      ? 'Ground floor'
+      : `Level ${level}`;
+  return `${floorplan.buildingName} · ${levelLabel} (ID ${floorplan.floorplanId})`;
+}
+
 export default function App() {
   const session = getStoredSession();
   const jwtToken = localStorage.getItem('jwt_token');
   const isAdmin = Boolean(jwtToken && session?.isAdmin === true);
-  const [imageUrl, setImageUrl] = useState(null);
+  const [floorplans, setFloorplans] = useState(FALLBACK_FLOORPLANS);
+  const [floorplanLoadStatus, setFloorplanLoadStatus] = useState('loading');
+  const [imageUrl, setImageUrl] = useState(FALLBACK_FLOORPLANS[0].imageUrl);
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [mode, setMode] = useState('ADD_NODE');
@@ -415,7 +460,9 @@ export default function App() {
 
   const [currentNodeName, setCurrentNodeName] = useState('Corridor');
   const [currentNodeType, setCurrentNodeType] = useState('Corridor');
-  const [currentFloorplanId, setCurrentFloorplanId] = useState(1);
+  const [currentFloorplanId, setCurrentFloorplanId] = useState(
+    FALLBACK_FLOORPLANS[0].floorplanId,
+  );
   const [currentLongitude, setCurrentLongitude] = useState('');
   const [currentLatitude, setCurrentLatitude] = useState('');
 
@@ -428,6 +475,50 @@ export default function App() {
     isRamp: false,
     isElevator: false,
   });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadFloorplans = async () => {
+      try {
+        const response = await fetch('/api/annotator/floorplans');
+        if (!response.ok) {
+          throw new Error('Unable to load floorplans.');
+        }
+        const body = await response.json();
+        const availableFloorplans = Array.isArray(body)
+          ? body.filter((floorplan) => (
+            Number.isFinite(Number(floorplan.floorplanId)) &&
+            typeof floorplan.buildingName === 'string' &&
+            floorplan.buildingName.trim()
+          ))
+          : [];
+
+        if (cancelled) return;
+        if (availableFloorplans.length === 0) {
+          setFloorplanLoadStatus('fallback');
+          return;
+        }
+
+        const initialFloorplan = availableFloorplans.find(
+          (floorplan) => Number(floorplan.floorplanId) === FALLBACK_FLOORPLANS[0].floorplanId,
+        ) || availableFloorplans[0];
+        setFloorplans(availableFloorplans);
+        setCurrentFloorplanId(Number(initialFloorplan.floorplanId));
+        setImageUrl(resolveFloorplanImageUrl(initialFloorplan.imageUrl));
+        setFloorplanLoadStatus('ready');
+      } catch {
+        if (!cancelled) {
+          setFloorplanLoadStatus('fallback');
+        }
+      }
+    };
+
+    loadFloorplans();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
@@ -541,8 +632,30 @@ export default function App() {
     }
   };
 
-  const handleFloorplanIdChange = (event) => {
-    setCurrentFloorplanId(parseInt(event.target.value, 10) || 1);
+  const handleFloorplanChange = (event) => {
+    const nextFloorplanId = Number(event.target.value);
+    const nextFloorplan = floorplans.find(
+      (floorplan) => Number(floorplan.floorplanId) === nextFloorplanId,
+    );
+
+    if (!nextFloorplan || nextFloorplanId === currentFloorplanId) {
+      return;
+    }
+    if (
+      (nodes.length > 0 || edges.length > 0) &&
+      !window.confirm('Switching floorplans will clear the current nodes and edges. Continue?')
+    ) {
+      return;
+    }
+
+    setCurrentFloorplanId(nextFloorplanId);
+    setImageUrl(resolveFloorplanImageUrl(nextFloorplan.imageUrl));
+    setNodes([]);
+    setEdges([]);
+    setHistory([]);
+    setSelectedNode(null);
+    setNextNodeId(1);
+    setNextEdgeId(1);
   };
 
   const handleCanvasClick = (e) => {
@@ -755,13 +868,30 @@ export default function App() {
       <div style={{ padding: '8px 10px', background: '#ecf0f1', display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'flex-start', borderBottom: '2px solid #bdc3c7', zIndex: 100 }}>
         <div style={toolbarPanelStyle}>
           <strong>0. Active Floorplan</strong>
-          <label>ID: <input type="number" value={currentFloorplanId} onChange={handleFloorplanIdChange} style={{ width: '80px' }} /></label>
+          <label>
+            Floorplan:
+            <select
+              aria-label="Floorplan"
+              value={currentFloorplanId}
+              onChange={handleFloorplanChange}
+              style={{ display: 'block', width: '230px', marginTop: '4px' }}
+            >
+              {floorplans.map((floorplan) => (
+                <option key={floorplan.floorplanId} value={floorplan.floorplanId}>
+                  {formatFloorplanLabel(floorplan)}
+                </option>
+              ))}
+            </select>
+          </label>
+          {floorplanLoadStatus === 'fallback' && (
+            <small>Using bundled COM1 floorplans.</small>
+          )}
         </div>
 
         <div style={{ ...toolbarPanelStyle, minWidth: '360px' }}>
           <strong>1. Core Tools</strong>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>Image:</span>
+            <span>Override image:</span>
             <input type="file" onChange={handleImageUpload} style={{ maxWidth: '230px' }} />
           </div>
           {isAdmin && (
