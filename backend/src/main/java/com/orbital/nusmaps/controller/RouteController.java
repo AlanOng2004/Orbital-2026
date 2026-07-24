@@ -146,7 +146,8 @@ public class RouteController {
                 node.getFloorplan().getLevel(),
                 node.getFloorplan().getImageUrl(),
                 node.getXCoordinate(),
-                node.getYCoordinate()
+                node.getYCoordinate(),
+                node.getRoomPolygon()
         );
     }
 

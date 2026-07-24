@@ -23,7 +23,8 @@ public record SameBuildingRouteResponse(
             Integer floorLevel,
             String floorImageUrl,
             Double x,
-            Double y
+            Double y,
+            String polygon
     ) {}
 
     public record RouteInstructionResponse(

@@ -132,21 +132,26 @@ body {
   background: #dbeeff;
 }
 
-.tourPopover--centered {
-  position: fixed !important;
-  inset: 50% auto auto 50% !important;
-  left: 50% !important;
-  top: 50% !important;
-  right: auto !important;
-  bottom: auto !important;
-  transform: translate(-50%, -50%) !important;
-  max-width: min(640px, calc(100vw - 40px)) !important;
-  width: min(640px, calc(100vw - 40px)) !important;
-  z-index: 100000 !important;
+.bookmarkPlaceButton {
+  flex: 0 0 auto;
+  min-height: 24px;
+  padding: 0 10px;
+  border: 1px solid rgba(210, 139, 0, 0.24);
+  border-radius: 999px;
+  background: #fffaf0;
+  color: #8a5b00;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-.tourPopover--centered .driver-popover-arrow {
-  display: none !important;
+.bookmarkPlaceButton:hover,
+.bookmarkPlaceButton.isSaved {
+  border-color: rgba(210, 139, 0, 0.42);
+  color: #724b00;
+  background: #ffefbf;
 }
 
 .tourSpotlightAnchor {
@@ -154,6 +159,100 @@ body {
   z-index: 70;
   pointer-events: none;
   opacity: 0.01;
+}
+
+.tutorialShield {
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  background: transparent;
+}
+
+.tutorialSpotlight {
+  position: fixed;
+  z-index: 99999;
+  border: 3px solid #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.68);
+  pointer-events: none;
+  transition: all 180ms ease;
+}
+
+.tutorialDialog {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 100000;
+  width: min(560px, calc(100vw - 40px));
+  padding: 26px 28px 22px;
+  border-radius: 20px;
+  background: #ffffff;
+  color: #172535;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.36);
+  box-sizing: border-box;
+  transform: translate(-50%, -50%);
+}
+
+.tutorialDialog h2 {
+  margin: 8px 36px 8px 0;
+  color: #17324b;
+  font-size: 22px;
+}
+
+.tutorialDialog p {
+  margin: 0;
+  color: #4b5f70;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.tutorialProgress {
+  color: #1477d4;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.tutorialClose {
+  position: absolute;
+  right: 16px;
+  top: 14px;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: #edf2f7;
+  color: #334155;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tutorialActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 22px;
+}
+
+.tutorialActions button {
+  min-width: 80px;
+  height: 38px;
+  padding: 0 18px;
+  border: 1px solid rgba(20, 119, 212, 0.24);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0f5ea8;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.tutorialActions .tutorialNext {
+  border-color: #1477d4;
+  background: #1477d4;
+  color: #ffffff;
 }
 
 .resultList {
@@ -192,13 +291,6 @@ body {
   color: #4f6f7f;
   font-size: 12px;
   text-transform: capitalize;
-}
-
-.quickActions {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 6px;
-  pointer-events: auto;
 }
 
 .routePlannerPanel {
@@ -346,6 +438,25 @@ body {
   box-shadow: 0 10px 24px rgba(20, 119, 212, 0.1);
 }
 
+.bookmarkRouteButton {
+  margin-top: 10px;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid rgba(20, 119, 212, 0.28);
+  border-radius: 9px;
+  background: #edf6ff;
+  color: #0f5ea8;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.bookmarkRouteButton.isSaved {
+  border-color: rgba(210, 139, 0, 0.34);
+  background: #fff7df;
+  color: #9a6500;
+}
+
 .routePlannerResults strong {
   display: block;
   color: #132536;
@@ -464,19 +575,6 @@ body {
   box-shadow: 0 10px 24px rgba(250, 204, 21, 0.3);
 }
 
-.quickActions button {
-  min-width: 92px;
-  min-height: 28px;
-  padding: 0 10px;
-  border: 2px solid #1b2f42;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.92);
-  color: #15202b;
-  font-size: 12px;
-  box-shadow: 0 8px 18px rgba(23, 37, 52, 0.12);
-  cursor: pointer;
-}
-
 .menuHandle {
   position: absolute;
   z-index: 45;
@@ -558,49 +656,80 @@ body {
   margin-top: 26px;
 }
 
-.historyBlock button {
-  display: none;
+.sideMenuGroup + .sideMenuGroup {
+  margin-top: 18px;
 }
 
-.menuDropdown > button {
-  display: block;
-  width: 100%;
-  min-height: 24px;
-  border: 0;
-  background: transparent;
-  color: #101418;
-  font-size: 16px;
-  text-align: left;
-  cursor: pointer;
+.sideMenuGroup h3 {
+  margin: 0 0 8px;
+  color: #4b5f70;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.menuDropdown > button span {
-  display: inline-block;
-  width: 24px;
-  margin-right: 8px;
+.sideMenuItemList,
+.sideMenuTextList {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.menuDropdownList {
-  margin: 4px 0 8px 34px;
-  padding-left: 10px;
-  border-left: 1px solid rgba(17, 24, 39, 0.16);
+.sideMenuItemList li {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
 }
 
-.menuDropdownList.isScrollable {
-  max-height: 244px;
-  overflow: auto;
-}
-
-.menuDropdownList button {
-  display: block;
-  width: 100%;
-  min-height: 28px;
-  border: 0;
-  background: transparent;
+.sideMenuItemList li > button:first-child,
+.sideMenuTextList li {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 10px;
+  background: #f7f9fb;
   color: #25313d;
   font-size: 13px;
+  line-height: 1.4;
   text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.sideMenuItemList li > button:first-child {
   cursor: pointer;
+}
+
+.sideMenuItemList li > button:first-child:hover {
+  border-color: rgba(20, 119, 212, 0.25);
+  background: #edf6ff;
+}
+
+.removeBookmarkButton {
+  flex: 0 0 32px;
+  width: 32px;
+  border: 0;
+  border-radius: 9px;
+  background: #f1f4f7;
+  color: #64748b;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.removeBookmarkButton:hover {
+  background: #feeceb;
+  color: #b42318;
+}
+
+.sideMenuEmpty {
+  margin: 0;
+  color: #6b7785;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .sideMenu label {
@@ -609,6 +738,11 @@ body {
   gap: 10px;
   min-height: 34px;
   font-size: 14px;
+}
+
+.escHint {
+  margin: 4px 0 0 24px;
+  font-size: 13px;
 }
 
 .locateButton {
@@ -851,11 +985,6 @@ body {
   outline-offset: 3px;
 }
 
-.escHint {
-  margin: 4px 0 0 24px;
-  font-size: 13px;
-}
-
 .uiHiddenPrompt {
   position: absolute;
   left: 50%;
@@ -1028,28 +1157,6 @@ body {
   .routePlannerSuggestions button span {
     min-width: 0;
     overflow-wrap: anywhere;
-  }
-
-  .quickActions {
-    width: 100%;
-    flex-wrap: nowrap;
-    gap: 8px;
-    overflow-x: auto;
-    padding-bottom: 2px;
-    scrollbar-width: none;
-  }
-
-  .quickActions::-webkit-scrollbar {
-    display: none;
-  }
-
-  .quickActions button {
-    flex: 0 0 auto;
-    min-width: auto;
-    min-height: 36px;
-    padding: 0 12px;
-    border-radius: 999px;
-    white-space: nowrap;
   }
 
   .routePlannerPanel {

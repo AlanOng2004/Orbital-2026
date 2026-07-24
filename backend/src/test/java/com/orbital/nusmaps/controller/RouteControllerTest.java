@@ -96,6 +96,18 @@ class RouteControllerTest {
         Node source = TestDataFactory.node(1L, "COM1-01-01", null, Node.NodeType.Room, floorplan, 0, 0);
         Node corridor = TestDataFactory.node(2L, "Aisle", null, Node.NodeType.Corridor, floorplan, 0, 30);
         Node target = TestDataFactory.node(3L, "COM1-01-02", null, Node.NodeType.Room, floorplan, 30, 30);
+        source.setRoomPolygon(List.of(
+                new double[]{10, 10},
+                new double[]{50, 10},
+                new double[]{50, 50},
+                new double[]{10, 50}
+        ));
+        target.setRoomPolygon(List.of(
+                new double[]{70, 70},
+                new double[]{110, 70},
+                new double[]{110, 110},
+                new double[]{70, 110}
+        ));
 
         Edge firstEdge = TestDataFactory.edge(1L, source, corridor, 30);
         Edge secondEdge = TestDataFactory.edge(2L, corridor, target, 30);
@@ -111,6 +123,8 @@ class RouteControllerTest {
         assertEquals("COM1", response.buildingName());
         assertEquals("Indoor route", response.route().label());
         assertEquals(3, response.route().pathNodes().size());
+        assertEquals(source.getRoomPolygon(), response.route().pathNodes().get(0).polygon());
+        assertEquals(target.getRoomPolygon(), response.route().pathNodes().get(2).polygon());
         assertEquals(0.7, response.route().estimatedTimeMinutes());
         assertEquals(
                 List.of(
