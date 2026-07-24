@@ -132,20 +132,38 @@ function getRecentRoutesStore() {
 function getRecentRoutes() {
   const routes = getRecentRoutesStore()[getAccountState().username];
   return Array.isArray(routes)
-    ? routes.filter((route) => typeof route === "string" && route.trim()).slice(0, MAX_RECENT_ROUTES)
+    ? routes
+        .filter(
+          (route) =>
+            route &&
+            typeof route === "object" &&
+            typeof route.label === "string" &&
+            route.label.trim() &&
+            route.source &&
+            route.destination,
+        )
+        .slice(0, MAX_RECENT_ROUTES)
     : [];
 }
 
-function recordRecentRoute(routeLabel) {
-  const normalizedLabel = String(routeLabel || "").trim();
-  if (!normalizedLabel) return;
+function recordRecentRoute(source, destination) {
+  const storedSource = serializeSearchItem(source);
+  const storedDestination = serializeSearchItem(destination);
+  if (!getRouteNodeId(storedSource) || !getRouteNodeId(storedDestination)) return;
 
   const account = getAccountState();
   const store = getRecentRoutesStore();
   const existingRoutes = Array.isArray(store[account.username]) ? store[account.username] : [];
+  const key = getRouteKey(storedSource, storedDestination);
+  const route = {
+    key,
+    label: `${getDisplayLabel(storedSource)} → ${getDisplayLabel(storedDestination)}`,
+    source: storedSource,
+    destination: storedDestination,
+  };
   store[account.username] = [
-    normalizedLabel,
-    ...existingRoutes.filter((route) => route !== normalizedLabel),
+    route,
+    ...existingRoutes.filter((existingRoute) => existingRoute?.key !== key),
   ].slice(0, MAX_RECENT_ROUTES);
 
   try {
@@ -502,9 +520,18 @@ function getSelectedRoute() {
 
 function getRouteNodesForFloor(route, floorId) {
   if (!route || !Array.isArray(route.pathNodes) || !floorId) return [];
-  return route.pathNodes.filter(
-    (node) => floorIdFromData(node.floorLevel, node.floorImageUrl) === floorId,
-  );
+  return route.pathNodes
+    .filter((node) => floorIdFromData(node.floorLevel, node.floorImageUrl) === floorId)
+    .map((node) => {
+      if (String(node.nodeType || "").toLowerCase() !== "room") return node;
+      const roomBox = parsePolygonBox(node.polygon);
+      if (!roomBox) return node;
+      return {
+        ...node,
+        x: roomBox.x + roomBox.width / 2,
+        y: roomBox.y + roomBox.height / 2,
+      };
+    });
 }
 
 function getRouteFloorSequence(route) {
@@ -1088,9 +1115,6 @@ function submitRoutePlanner() {
     return;
   }
 
-  const recentRouteLabel = `${getDisplayLabel(
-    state.routePlanner.srcSelection,
-  )} → ${getDisplayLabel(state.routePlanner.dstSelection)}`;
   state.routePlanner.loading = true;
   state.routePlanner.error = "";
   render();
@@ -1112,7 +1136,10 @@ function submitRoutePlanner() {
       state.routePlanner.stage = "results";
       state.routePlanner.loading = false;
       if (state.routePlanner.route) {
-        recordRecentRoute(recentRouteLabel);
+        recordRecentRoute(
+          state.routePlanner.srcSelection,
+          state.routePlanner.dstSelection,
+        );
         openSelectedRouteFloor(state.routePlanner.route);
       }
       render();
@@ -1636,7 +1663,7 @@ function render() {
                       aria-label="${currentPlaceIsBookmarked ? "Remove place bookmark" : "Bookmark place"}"
                       aria-pressed="${currentPlaceIsBookmarked}"
                       title="${currentPlaceIsBookmarked ? "Remove place bookmark" : "Bookmark place"}"
-                    >${currentPlaceIsBookmarked ? "★" : "☆"}</button>`
+                    >${currentPlaceIsBookmarked ? "Saved place" : "Save place"}</button>`
                   : ""
               }
               <button id="tourButton" type="button" class="tourButton">How to use</button>
@@ -1812,8 +1839,16 @@ function render() {
                 <h3>Routes</h3>
                 ${
                   recentRoutes.length > 0
-                    ? `<ul class="sideMenuTextList">
-                        ${recentRoutes.map((route) => `<li>${escapeHtml(route)}</li>`).join("")}
+                    ? `<ul class="sideMenuItemList">
+                        ${recentRoutes
+                          .map(
+                            (route, index) => `<li>
+                              <button type="button" data-recent-route-index="${index}">
+                                ${escapeHtml(route.label)}
+                              </button>
+                            </li>`,
+                          )
+                          .join("")}
                       </ul>`
                     : `<p class="sideMenuEmpty">No recent routes yet.</p>`
                 }
@@ -2316,6 +2351,13 @@ function bindEvents(root, cameraViewport, visibleCamera) {
     button.addEventListener("click", () => {
       const place = getRecentPlaces()[Number(button.dataset.recentPlaceIndex)];
       if (place) openStoredPlace(place);
+    });
+  });
+
+  root.querySelectorAll("[data-recent-route-index]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const route = getRecentRoutes()[Number(button.dataset.recentRouteIndex)];
+      if (route) openStoredRoute(route);
     });
   });
 
