@@ -73,6 +73,16 @@ body {
   pointer-events: none;
 }
 
+.campusCompassMask {
+  position: absolute;
+  left: 2905px;
+  top: 45px;
+  width: 165px;
+  height: 650px;
+  background: #eef0f2;
+  pointer-events: none;
+}
+
 .viewer--map-page .mapPlane {
   filter: grayscale(0.95) opacity(0.38);
 }

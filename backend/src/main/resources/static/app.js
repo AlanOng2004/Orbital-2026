@@ -1616,6 +1616,7 @@ function render() {
         />
         <div class="campusLegendMask" aria-hidden="true"></div>
         <div class="campusScaleMask" aria-hidden="true"></div>
+        <div class="campusCompassMask" aria-hidden="true"></div>
         ${
           state.activeResult && state.activeResult.box && state.mode === "home"
             ? `<div
