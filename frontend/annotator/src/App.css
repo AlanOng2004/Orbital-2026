@@ -182,3 +182,209 @@
     border-right-color: var(--border);
   }
 }
+
+.annotatorTopBar {
+  min-height: 58px;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  color: #263746;
+  background: #ffffff;
+  border-bottom: 1px solid #d9e0e5;
+  box-sizing: border-box;
+}
+
+.annotatorTopBar > div,
+.annotatorTopBar nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.annotatorBrand {
+  color: #1477d4;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.annotatorTopBar nav a,
+.annotatorTopBar nav button {
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid #cbd6de;
+  border-radius: 999px;
+  color: #23415a;
+  background: #f7fafc;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 34px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.annotatorTopBar nav a {
+  color: #ffffff;
+  background: #172f44;
+  border-color: #172f44;
+}
+
+.suggestionModalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(12, 24, 34, 0.58);
+  box-sizing: border-box;
+}
+
+.suggestionModal {
+  position: relative;
+  width: min(520px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  padding: 28px;
+  border-radius: 18px;
+  color: #1f2f3d;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(10, 24, 36, 0.28);
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.suggestionModalClose {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  color: #536474;
+  background: #edf2f5;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.suggestionEyebrow {
+  color: #1477d4;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.suggestionModal h2 {
+  margin: 6px 40px 6px 0;
+  color: #172f44;
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.suggestionModal > p {
+  color: #657584;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.suggestionModal form {
+  display: grid;
+  gap: 16px;
+  margin-top: 22px;
+}
+
+.suggestionModal label {
+  display: grid;
+  gap: 7px;
+  color: #314454;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.suggestionModal input,
+.suggestionModal textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cbd6de;
+  border-radius: 10px;
+  color: #1f2f3d;
+  background: #ffffff;
+  font: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.suggestionModal textarea {
+  resize: vertical;
+}
+
+.suggestionStatus {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.suggestionStatus--error {
+  color: #98251d;
+  background: #fff0ee;
+}
+
+.suggestionStatus--success {
+  color: #17623b;
+  background: #eaf8f0;
+}
+
+.suggestionModalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.suggestionModalActions button {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid #cbd6de;
+  border-radius: 10px;
+  color: #314454;
+  background: #ffffff;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.suggestionModalActions .suggestionSubmitButton {
+  border-color: #1477d4;
+  color: #ffffff;
+  background: #1477d4;
+}
+
+.suggestionModalActions button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+@media (max-width: 640px) {
+  .annotatorTopBar {
+    align-items: flex-start;
+    padding: 10px 12px;
+  }
+
+  .annotatorTopBar > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .annotatorTopBar nav {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .suggestionModal {
+    padding: 24px 18px 18px;
+  }
+}

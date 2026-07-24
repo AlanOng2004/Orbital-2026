@@ -8,22 +8,13 @@ const MAP = {
   height: 2197,
 };
 
-const SIDE_MENU_WIDTH = 320;
+const SIDE_MENU_WIDTH = 340;
+const SIDE_MENU_RAIL_WIDTH = 88;
 const COM1_FLOORS = [
   { id: "B1", img: "img/COMBLK1_B1.jpg", width: 997, height: 580 },
   { id: "L1", img: "img/COMBLK1_01.jpg", width: 2566, height: 1712 },
   { id: "L2", img: "img/COMBLK1_02.jpg", width: 2736, height: 1734 },
   { id: "L3", img: "img/COMBLK1_03.jpg", width: 997, height: 580 },
-];
-
-const LEGEND_ITEMS = [
-  ["Academic", "#397dac"],
-  ["Housing", "#f5ae2f"],
-  ["Infrastructure", "#cbbda3"],
-  ["LT", "#9b735f"],
-  ["Research", "#df6d81"],
-  ["Staff Housing", "#d9db9d"],
-  ["Support", "#9ac867"],
 ];
 
 const imageBox = ({ x, y, width, height }) => ({
@@ -363,7 +354,6 @@ const state = {
   },
   hideOptions: {
     distance: false,
-    legend: false,
     compass: false,
     ui: false,
   },
@@ -874,11 +864,19 @@ function shortestDelta(from, to) {
   return ((delta + 540) % 360) - 180;
 }
 
-function getCameraViewport(windowSize, sideMenuOpen) {
+function getCameraViewport(windowSize, sideMenuOpen, showMenu = true) {
+  const desktopMenuWidth =
+    sideMenuOpen
+      ? Math.min(SIDE_MENU_WIDTH, Math.round(windowSize.width * 0.4))
+      : SIDE_MENU_RAIL_WIDTH;
   const menuWidth =
-    sideMenuOpen && windowSize.width > 760
-      ? Math.min(SIDE_MENU_WIDTH, Math.round(windowSize.width * 0.32))
-      : 0;
+    !showMenu
+      ? 0
+      : windowSize.width > 760
+      ? desktopMenuWidth
+      : sideMenuOpen
+        ? Math.min(SIDE_MENU_WIDTH, Math.round(windowSize.width * 0.9))
+        : 0;
 
   return {
     x: menuWidth,
@@ -1009,7 +1007,7 @@ function cameraForBox(box, cameraViewport, bearing, padding = 140) {
 }
 
 function getCameraViewportState() {
-  return getCameraViewport(state.windowSize, state.sideMenuOpen);
+  return getCameraViewport(state.windowSize, state.sideMenuOpen, !state.hideOptions.ui);
 }
 
 function getBoundsViewport() {
@@ -1616,6 +1614,7 @@ function render() {
           alt=""
           style="left:${-MAP.cropX}px;top:${-MAP.cropY}px;width:${MAP.sourceWidth}px;height:${MAP.sourceHeight}px;"
         />
+        <div class="campusLegendMask" aria-hidden="true"></div>
         ${
           state.activeResult && state.activeResult.box && state.mode === "home"
             ? `<div
@@ -1802,23 +1801,114 @@ function render() {
     ${
       visibleUi
         ? `<aside
-            class="sideMenu ${state.sideMenuOpen ? "isOpen" : ""}"
+            class="sideMenu ${state.sideMenuOpen ? "isOpen" : "isCollapsed"}"
             style="left:${cameraViewport.outerX}px;top:${cameraViewport.outerY}px;width:${
-            cameraViewport.menuWidth || SIDE_MENU_WIDTH
+            state.sideMenuOpen ? cameraViewport.menuWidth || SIDE_MENU_WIDTH : SIDE_MENU_RAIL_WIDTH
           }px;height:${cameraViewport.outerHeight}px;"
           >
-            <header>
-              <strong>${escapeHtml(account.username)}</strong>
-              ${
-                account.isGuest
-                  ? `<a class="accountAction" href="/login.html">sign in</a>`
-                  : `<button class="accountAction" type="button" data-account-action="sign-out">sign out</button>`
-              }
-            </header>
-            <section class="historyBlock">
-              <h2>Recent</h2>
-              <div class="sideMenuGroup">
-                <h3>Places</h3>
+            <nav class="sideMenuRail" aria-label="Map menu">
+              <button
+                id="menuHandle"
+                class="railMenuButton"
+                type="button"
+                aria-label="${state.sideMenuOpen ? "Close side menu" : "Open side menu"}"
+                aria-expanded="${state.sideMenuOpen}"
+              >
+                ${renderSideMenuIcon("menu")}
+              </button>
+              <button type="button" data-menu-section="bookmarks">
+                ${renderSideMenuIcon("bookmark")}
+                <span>Saved</span>
+              </button>
+              <button type="button" data-menu-section="history">
+                ${renderSideMenuIcon("recent")}
+                <span>Recents</span>
+              </button>
+              <div class="railSpacer"></div>
+              <button type="button" data-menu-section="hide">
+                ${renderSideMenuIcon("more")}
+                <span>More</span>
+              </button>
+              <button type="button" class="railAccountButton" data-menu-section="account">
+                <span class="railAvatar">${escapeHtml(account.username.charAt(0).toUpperCase() || "G")}</span>
+                <span>Account</span>
+              </button>
+            </nav>
+            <div class="sideMenuPanel">
+              <header data-menu-content="account">
+                <div class="accountIdentity">
+                  <span>${escapeHtml(account.username.charAt(0).toUpperCase() || "G")}</span>
+                  <div>
+                    <strong>${escapeHtml(account.username)}</strong>
+                    ${
+                      account.isGuest
+                        ? `<a class="accountAction" href="/login.html">sign in</a>`
+                        : `<button class="accountAction" type="button" data-account-action="sign-out">sign out</button>`
+                    }
+                  </div>
+                </div>
+                <a class="annotatorLink" href="/annotator/index.html">
+                  ${renderSideMenuIcon("annotator")}
+                  <span>Open route annotator</span>
+                </a>
+              </header>
+              <section class="bookmarksBlock" data-menu-content="bookmarks">
+                <h2>${renderSideMenuIcon("bookmark")} <span>Saved</span></h2>
+                <div class="sideMenuGroup">
+                  <h3>Places</h3>
+                  ${
+                    bookmarks.places.length > 0
+                      ? `<ul class="sideMenuItemList">
+                          ${bookmarks.places
+                            .map(
+                              (bookmark, index) => `<li>
+                                <button type="button" data-bookmark-place-index="${index}">
+                                  ${escapeHtml(bookmark.label)}
+                                </button>
+                                <button
+                                  type="button"
+                                  class="removeBookmarkButton"
+                                  data-remove-bookmark-type="place"
+                                  data-remove-bookmark-key="${escapeHtml(bookmark.key)}"
+                                  aria-label="Remove ${escapeHtml(bookmark.label)} bookmark"
+                                >×</button>
+                              </li>`,
+                            )
+                            .join("")}
+                        </ul>`
+                      : `<p class="sideMenuEmpty">No saved places yet.</p>`
+                  }
+                </div>
+                <div class="sideMenuGroup">
+                  <h3>Routes</h3>
+                  ${
+                    bookmarks.routes.length > 0
+                      ? `<ul class="sideMenuItemList">
+                          ${bookmarks.routes
+                            .map(
+                              (bookmark, index) => `<li>
+                                <button type="button" data-bookmark-route-index="${index}">
+                                  ${escapeHtml(bookmark.label)}
+                                </button>
+                                <button
+                                  type="button"
+                                  class="removeBookmarkButton"
+                                  data-remove-bookmark-type="route"
+                                  data-remove-bookmark-key="${escapeHtml(bookmark.key)}"
+                                  aria-label="Remove ${escapeHtml(bookmark.label)} bookmark"
+                                >×</button>
+                              </li>`,
+                            )
+                            .join("")}
+                        </ul>`
+                      : `<p class="sideMenuEmpty">No saved routes yet.</p>`
+                  }
+                </div>
+              </section>
+              <section class="historyBlock" data-menu-content="history">
+                <h2>${renderSideMenuIcon("recent")} <span>Recents</span></h2>
+                <div class="sideMenuGroup">
+                  <h3>Places</h3>
                 ${
                   recentPlaces.length > 0
                     ? `<ul class="sideMenuItemList">
@@ -1853,82 +1943,16 @@ function render() {
                     : `<p class="sideMenuEmpty">No recent routes yet.</p>`
                 }
               </div>
-            </section>
-            <section class="bookmarksBlock">
-              <h2>Bookmarks</h2>
-              <div class="sideMenuGroup">
-                <h3>Places</h3>
-                ${
-                  bookmarks.places.length > 0
-                    ? `<ul class="sideMenuItemList">
-                        ${bookmarks.places
-                          .map(
-                            (bookmark, index) => `<li>
-                              <button type="button" data-bookmark-place-index="${index}">
-                                ${escapeHtml(bookmark.label)}
-                              </button>
-                              <button
-                                type="button"
-                                class="removeBookmarkButton"
-                                data-remove-bookmark-type="place"
-                                data-remove-bookmark-key="${escapeHtml(bookmark.key)}"
-                                aria-label="Remove ${escapeHtml(bookmark.label)} bookmark"
-                              >×</button>
-                            </li>`,
-                          )
-                          .join("")}
-                      </ul>`
-                    : `<p class="sideMenuEmpty">No bookmarked places yet.</p>`
-                }
-              </div>
-              <div class="sideMenuGroup">
-                <h3>Routes</h3>
-                ${
-                  bookmarks.routes.length > 0
-                    ? `<ul class="sideMenuItemList">
-                        ${bookmarks.routes
-                          .map(
-                            (bookmark, index) => `<li>
-                              <button type="button" data-bookmark-route-index="${index}">
-                                ${escapeHtml(bookmark.label)}
-                              </button>
-                              <button
-                                type="button"
-                                class="removeBookmarkButton"
-                                data-remove-bookmark-type="route"
-                                data-remove-bookmark-key="${escapeHtml(bookmark.key)}"
-                                aria-label="Remove ${escapeHtml(bookmark.label)} bookmark"
-                              >×</button>
-                            </li>`,
-                          )
-                          .join("")}
-                      </ul>`
-                    : `<p class="sideMenuEmpty">No bookmarked routes yet.</p>`
-                }
-              </div>
-            </section>
-            <section class="hideBlock">
-              <h2>Hide</h2>
+              </section>
+              <section class="hideBlock" data-menu-content="hide">
+              <h2>${renderSideMenuIcon("more")} <span>Display</span></h2>
               ${renderHideCheckbox("distance", "Distance Marker")}
-              ${renderHideCheckbox("legend", "Building Legend")}
               ${renderHideCheckbox("compass", "Compass")}
               ${renderHideCheckbox("ui", "UI")}
               <p class="escHint">(Press Esc to exit)</p>
-            </section>
+              </section>
+            </div>
           </aside>`
-        : ""
-    }
-    ${
-      visibleUi
-        ? `<button
-            id="menuHandle"
-            class="menuHandle"
-            type="button"
-            aria-label="${state.sideMenuOpen ? "Close side menu" : "Open side menu"}"
-            style="left:${state.sideMenuOpen ? cameraViewport.x - 1 : cameraViewport.outerX}px;top:${
-            cameraViewport.y + cameraViewport.height / 2 - 28
-          }px;"
-          >${state.sideMenuOpen ? "<<" : ">>"}</button>`
         : ""
     }
     ${
@@ -1937,9 +1961,7 @@ function render() {
             id="tourMenuHandleSpotlight"
             class="tourSpotlightAnchor"
             aria-hidden="true"
-            style="left:${cameraViewport.outerX}px;top:${
-            cameraViewport.y + cameraViewport.height / 2 - 110
-          }px;width:108px;height:240px;"
+            style="left:${cameraViewport.outerX}px;top:${cameraViewport.outerY}px;width:${SIDE_MENU_RAIL_WIDTH}px;height:250px;"
           ></div>`
         : ""
     }
@@ -1950,7 +1972,7 @@ function render() {
             class="tourSpotlightAnchor"
             aria-hidden="true"
             style="left:${cameraViewport.outerX}px;top:${cameraViewport.outerY}px;width:${
-            cameraViewport.menuWidth || SIDE_MENU_WIDTH
+            state.sideMenuOpen ? cameraViewport.menuWidth || SIDE_MENU_WIDTH : SIDE_MENU_RAIL_WIDTH
           }px;height:${cameraViewport.outerHeight}px;"
           ></div>`
         : ""
@@ -2036,21 +2058,6 @@ function render() {
                 .join("")}
               <strong>Meters</strong>
             </div>
-          </div>`
-        : ""
-    }
-    ${
-      visibleUi && !state.hideOptions.legend
-        ? `<div
-            class="legendOverlay"
-            style="left:${cameraViewport.x + cameraViewport.width - 274}px;top:${
-            cameraViewport.y + cameraViewport.height - 174
-          }px;"
-          >
-            ${LEGEND_ITEMS.map(
-              ([label, color]) =>
-                `<div><span style="background:${color}"></span><p>${escapeHtml(label)}</p></div>`,
-            ).join("")}
           </div>`
         : ""
     }
@@ -2230,6 +2237,33 @@ function renderHideCheckbox(key, label) {
   } /><span>${escapeHtml(label)}</span></label>`;
 }
 
+function renderSideMenuIcon(name) {
+  const paths = {
+    menu: `
+      <path d="M4 6h16M4 12h16M4 18h16" />
+    `,
+    bookmark: `
+      <path d="M6.5 4.5A1.5 1.5 0 0 1 8 3h8a1.5 1.5 0 0 1 1.5 1.5V21L12 17.8 6.5 21V4.5Z" />
+    `,
+    recent: `
+      <path d="M4.2 8.2A8 8 0 1 1 4 15" />
+      <path d="M4.2 4.5v3.7h3.7M12 7.5V12l3 2" />
+    `,
+    more: `
+      <circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none" />
+    `,
+    annotator: `
+      <path d="M4 19.5h5l9.8-9.8a2.1 2.1 0 0 0-3-3L6 16.5l-2 3Z" />
+      <path d="m14.5 8 3 3M12 19.5h8" />
+    `,
+  };
+  return `<svg class="sideMenuIcon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${
+    paths[name] || paths.more
+  }</svg>`;
+}
+
 function renderRouteInstructions(route) {
   if (!route || !Array.isArray(route.instructions) || route.instructions.length === 0) {
     return "";
@@ -2303,6 +2337,19 @@ function bindEvents(root, cameraViewport, visibleCamera) {
     button.addEventListener("click", () => {
       const item = getResults().find((entry) => entry.id === button.dataset.resultId);
       if (item) selectResult(item);
+    });
+  });
+
+  root.querySelectorAll("[data-menu-section]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const section = button.dataset.menuSection;
+      state.sideMenuOpen = true;
+      render();
+      window.requestAnimationFrame(() => {
+        document
+          .querySelector(`[data-menu-content="${section}"]`)
+          ?.scrollIntoView({ block: "start", behavior: "smooth" });
+      });
     });
   });
 

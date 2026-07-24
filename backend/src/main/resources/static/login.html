@@ -117,13 +117,22 @@
           token: data.token
         }));
 
-        // 3. Route based on your database role string
+        // 3. Return to an allowed requested page, otherwise use the default page for the role.
         setTimeout(() => {
-          if (data.user.isAdmin) {
-            window.location.href = '/annotator/index.html';
-          } else {
-            window.location.href = '/index.html';
-          }
+          const requestedRedirect = new URLSearchParams(window.location.search).get('redirect');
+          const safeRedirect =
+            requestedRedirect &&
+            requestedRedirect.startsWith('/') &&
+            !requestedRedirect.startsWith('//')
+              ? requestedRedirect
+              : null;
+          const adminOnlyRedirect = safeRedirect === '/suggested-routes.html';
+          window.location.href =
+            safeRedirect && (!adminOnlyRedirect || data.user.isAdmin)
+              ? safeRedirect
+              : data.user.isAdmin
+                ? '/annotator/index.html'
+                : '/index.html';
         }, 0);
 
       } catch (err) {

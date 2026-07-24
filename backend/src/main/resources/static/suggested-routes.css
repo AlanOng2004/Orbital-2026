@@ -1,0 +1,249 @@
+:root {
+  color: #1e2d39;
+  background: #f3f6f8;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+button,
+a {
+  font: inherit;
+}
+
+.pageHeader {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  min-height: 64px;
+  padding: 0 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  background: rgba(255, 255, 255, 0.94);
+  border-bottom: 1px solid #dce4e9;
+  backdrop-filter: blur(16px);
+}
+
+.pageHeader > div,
+.pageHeader nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pageHeader a {
+  color: #1477d4;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.pageHeader nav a,
+.pageHeader nav button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid #cbd6de;
+  border-radius: 999px;
+  color: #294357;
+  background: #ffffff;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 34px;
+  cursor: pointer;
+}
+
+.pageHeader nav button {
+  line-height: normal;
+}
+
+main {
+  width: min(1040px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 56px 0 80px;
+}
+
+.pageIntro > span {
+  color: #1477d4;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.pageIntro h1 {
+  margin: 8px 0 8px;
+  color: #142a3d;
+  font-size: clamp(36px, 6vw, 58px);
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+
+.pageIntro p {
+  max-width: 680px;
+  margin: 0;
+  color: #667684;
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.suggestionsPanel {
+  margin-top: 38px;
+  padding: 24px;
+  border: 1px solid #dce4e9;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 20px 54px rgba(31, 51, 67, 0.08);
+}
+
+.panelHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.panelHeading h2 {
+  margin: 0;
+  color: #1d3344;
+  font-size: 20px;
+}
+
+.panelHeading p {
+  margin: 4px 0 0;
+  color: #74838f;
+  font-size: 13px;
+}
+
+.panelHeading button,
+.suggestionCard button {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid #cbd6de;
+  border-radius: 10px;
+  color: #294357;
+  background: #f8fafb;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.suggestionList {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.suggestionCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid #e0e7eb;
+  border-radius: 14px;
+  background: #fbfcfd;
+}
+
+.suggestionCard h3 {
+  margin: 0 0 6px;
+  color: #1b3244;
+  font-size: 17px;
+}
+
+.suggestionCard p {
+  margin: 0;
+  color: #5e6f7d;
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.suggestionMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 13px;
+  color: #7b8994;
+  font-size: 12px;
+}
+
+.suggestionMeta strong {
+  color: #526675;
+}
+
+.suggestionCard button {
+  align-self: center;
+  color: #ffffff;
+  background: #1477d4;
+  border-color: #1477d4;
+}
+
+.statusMessage {
+  display: none;
+  margin-top: 20px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  color: #8a2c25;
+  background: #fff0ee;
+  font-size: 14px;
+}
+
+.statusMessage.isVisible {
+  display: block;
+}
+
+.emptyState {
+  padding: 48px 18px;
+  border: 1px dashed #cad5dc;
+  border-radius: 14px;
+  color: #70808c;
+  text-align: center;
+}
+
+@media (max-width: 680px) {
+  .pageHeader {
+    align-items: flex-start;
+    padding: 12px 16px;
+  }
+
+  .pageHeader > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .pageHeader > div span {
+    display: none;
+  }
+
+  .pageHeader nav {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  main {
+    width: min(100% - 24px, 1040px);
+    padding-top: 36px;
+  }
+
+  .suggestionsPanel {
+    padding: 16px;
+  }
+
+  .suggestionCard {
+    grid-template-columns: 1fr;
+  }
+
+  .suggestionCard button {
+    justify-self: start;
+  }
+}

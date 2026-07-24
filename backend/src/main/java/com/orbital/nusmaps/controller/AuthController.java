@@ -47,7 +47,8 @@ public class AuthController {
         User newUser = new User();
         newUser.setUsername(request.getUsername());
         newUser.setPassword(request.getPassword());
-        newUser.setIsAdmin(Boolean.TRUE.equals(request.getIsAdmin()));
+        // Public signup can never create an administrator account.
+        newUser.setIsAdmin(false);
         newUser.setGender(parseGender(request.getGender()));
 
         User savedUser = registerService.register(newUser);
