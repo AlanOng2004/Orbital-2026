@@ -16,62 +16,6 @@ const COM1_FLOORS = [
   { id: "L3", img: "img/COMBLK1_03.jpg", width: 997, height: 580 },
 ];
 
-const MENU_LISTS = {
-  recentPlaces: [
-    "COM1",
-    "COM4",
-    "School of Computing",
-    "LT15",
-    "Central Library",
-    "University Hall",
-    "UTown",
-    "Faculty of Science",
-    "NUS Business School",
-    "Yusof Ishak House",
-    "Kent Ridge MRT",
-    "Ventus",
-  ],
-  recentRoutes: [
-    "COM1 to LT15",
-    "COM1 to Central Library",
-    "COM1 to UTown",
-    "Kent Ridge MRT to COM1",
-    "COM4 to COM1",
-    "COM1 to Business School",
-    "COM1 to YIH",
-    "COM1 to Faculty of Science",
-    "COM1 to University Hall",
-    "COM1 to Ventus",
-    "COM1 to Prince George's Park",
-  ],
-  bookmarkPlaces: [
-    "COM1 Database Labs",
-    "COM1 SR 1",
-    "School of Computing",
-    "Central Library",
-    "UTown Food",
-    "Kent Ridge MRT",
-    "Techno Edge",
-    "Frontier",
-    "Yusof Ishak House",
-    "University Hall",
-    "Medicine",
-  ],
-  bookmarkRoutes: [
-    "Home to COM1",
-    "COM1 to Central Library",
-    "COM1 to LT15",
-    "COM1 to UTown",
-    "COM1 to Kent Ridge MRT",
-    "COM1 to YIH",
-    "COM1 to Science",
-    "COM1 to Business",
-    "COM1 to Medicine",
-    "COM1 to PGP",
-    "COM1 to Ventus",
-  ],
-};
-
 const LEGEND_ITEMS = [
   ["Academic", "#397dac"],
   ["Housing", "#f5ae2f"],
@@ -139,15 +83,14 @@ const SEARCH_ITEMS = [
   },
 ];
 
-const QUICK_ACTIONS = ["🍴 Food", "📖 Empty Rooms", "🚻 Toilets", "🚌 Bus Stop"];
-const ROUTE_OPTIONS = ["Less walking", "Walking only", "Sheltered Paths", "No keycard"];
-const DRIVER_VERSION = "1.5.0";
-const DRIVER_CSS_ID = "driverjs-theme";
-const DRIVER_SCRIPT_ID = "driverjs-script";
 const TOUR_STORAGE_KEY = "points_app_tour_seen";
+const RECENT_ROUTES_STORAGE_KEY = "points_app_recent_routes";
+const RECENT_PLACES_STORAGE_KEY = "points_app_recent_places";
+const BOOKMARKS_STORAGE_KEY = "points_app_bookmarks";
+const MAX_RECENT_ROUTES = 10;
+const MAX_RECENT_PLACES = 10;
 
 let activeTour = null;
-let pendingTourStart = false;
 const DEFAULT_CAMERA = {
   centerX: MAP.width / 2,
   centerY: MAP.height / 2,
@@ -177,6 +120,199 @@ function getAccountState() {
   };
 }
 
+function getRecentRoutesStore() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RECENT_ROUTES_STORAGE_KEY) || "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function getRecentRoutes() {
+  const routes = getRecentRoutesStore()[getAccountState().username];
+  return Array.isArray(routes)
+    ? routes.filter((route) => typeof route === "string" && route.trim()).slice(0, MAX_RECENT_ROUTES)
+    : [];
+}
+
+function recordRecentRoute(routeLabel) {
+  const normalizedLabel = String(routeLabel || "").trim();
+  if (!normalizedLabel) return;
+
+  const account = getAccountState();
+  const store = getRecentRoutesStore();
+  const existingRoutes = Array.isArray(store[account.username]) ? store[account.username] : [];
+  store[account.username] = [
+    normalizedLabel,
+    ...existingRoutes.filter((route) => route !== normalizedLabel),
+  ].slice(0, MAX_RECENT_ROUTES);
+
+  try {
+    localStorage.setItem(RECENT_ROUTES_STORAGE_KEY, JSON.stringify(store));
+  } catch {
+    // Route history is best-effort when storage is unavailable.
+  }
+}
+
+function serializeSearchItem(item) {
+  if (!item) return null;
+  return {
+    id: item.id,
+    type: item.type,
+    label: item.label,
+    displayLabel: item.displayLabel,
+    secondaryLabel: item.secondaryLabel,
+    aliases: Array.isArray(item.aliases) ? item.aliases : [],
+    buildingId: item.buildingId,
+    floor: item.floor,
+    roomBox: item.roomBox,
+    nodePoint: item.nodePoint,
+    routeNodeId: item.routeNodeId,
+    box: item.box,
+    floorData: item.floorData,
+  };
+}
+
+function getRecentPlacesStore() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RECENT_PLACES_STORAGE_KEY) || "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function getRecentPlaces() {
+  const places = getRecentPlacesStore()[getAccountState().username];
+  return Array.isArray(places)
+    ? places.filter((place) => place && typeof place === "object").slice(0, MAX_RECENT_PLACES)
+    : [];
+}
+
+function getPlaceKey(item) {
+  return `${item?.type || "place"}:${normalize(getDisplayLabel(item || { label: "" }))}`;
+}
+
+function recordRecentPlace(item) {
+  const storedItem = serializeSearchItem(item);
+  if (!storedItem?.label) return;
+
+  const account = getAccountState();
+  const store = getRecentPlacesStore();
+  const existingPlaces = Array.isArray(store[account.username]) ? store[account.username] : [];
+  const key = getPlaceKey(storedItem);
+  store[account.username] = [
+    storedItem,
+    ...existingPlaces.filter((place) => getPlaceKey(place) !== key),
+  ].slice(0, MAX_RECENT_PLACES);
+
+  try {
+    localStorage.setItem(RECENT_PLACES_STORAGE_KEY, JSON.stringify(store));
+  } catch {
+    // Place history is best-effort when storage is unavailable.
+  }
+}
+
+function getBookmarksStore() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(BOOKMARKS_STORAGE_KEY) || "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function getBookmarks() {
+  const accountBookmarks = getBookmarksStore()[getAccountState().username];
+  return {
+    places: Array.isArray(accountBookmarks?.places) ? accountBookmarks.places : [],
+    routes: Array.isArray(accountBookmarks?.routes) ? accountBookmarks.routes : [],
+  };
+}
+
+function saveBookmarks(bookmarks) {
+  const account = getAccountState();
+  const store = getBookmarksStore();
+  store[account.username] = {
+    places: bookmarks.places.slice(0, 30),
+    routes: bookmarks.routes.slice(0, 30),
+  };
+  try {
+    localStorage.setItem(BOOKMARKS_STORAGE_KEY, JSON.stringify(store));
+  } catch {
+    // Bookmark persistence is best-effort when storage is unavailable.
+  }
+}
+
+function getRouteKey(source, destination) {
+  const sourceKey = getRouteNodeId(source) || normalize(getDisplayLabel(source || { label: "" }));
+  const destinationKey =
+    getRouteNodeId(destination) || normalize(getDisplayLabel(destination || { label: "" }));
+  return `${sourceKey}->${destinationKey}`;
+}
+
+function isPlaceBookmarked(item) {
+  if (!item) return false;
+  const key = getPlaceKey(item);
+  return getBookmarks().places.some((bookmark) => bookmark.key === key);
+}
+
+function isRouteBookmarked(source, destination) {
+  if (!source || !destination) return false;
+  const key = getRouteKey(source, destination);
+  return getBookmarks().routes.some((bookmark) => bookmark.key === key);
+}
+
+function togglePlaceBookmark(item) {
+  const storedItem = serializeSearchItem(item);
+  if (!storedItem?.label) return;
+  const bookmarks = getBookmarks();
+  const key = getPlaceKey(storedItem);
+  const existingIndex = bookmarks.places.findIndex((bookmark) => bookmark.key === key);
+  if (existingIndex >= 0) {
+    bookmarks.places.splice(existingIndex, 1);
+  } else {
+    bookmarks.places.unshift({
+      key,
+      label: getDisplayLabel(storedItem),
+      item: storedItem,
+    });
+  }
+  saveBookmarks(bookmarks);
+  render();
+}
+
+function toggleRouteBookmark(source, destination) {
+  if (!source || !destination) return;
+  const bookmarks = getBookmarks();
+  const key = getRouteKey(source, destination);
+  const existingIndex = bookmarks.routes.findIndex((bookmark) => bookmark.key === key);
+  if (existingIndex >= 0) {
+    bookmarks.routes.splice(existingIndex, 1);
+  } else {
+    bookmarks.routes.unshift({
+      key,
+      label: `${getDisplayLabel(source)} → ${getDisplayLabel(destination)}`,
+      source: serializeSearchItem(source),
+      destination: serializeSearchItem(destination),
+    });
+  }
+  saveBookmarks(bookmarks);
+  render();
+}
+
+function removeBookmark(type, key) {
+  const bookmarks = getBookmarks();
+  if (type === "place") {
+    bookmarks.places = bookmarks.places.filter((bookmark) => bookmark.key !== key);
+  } else if (type === "route") {
+    bookmarks.routes = bookmarks.routes.filter((bookmark) => bookmark.key !== key);
+  }
+  saveBookmarks(bookmarks);
+  render();
+}
+
 const state = {
   windowSize: { width: window.innerWidth, height: window.innerHeight },
   camera: null,
@@ -191,7 +327,6 @@ const state = {
   activeFloor: "L1",
   activeRoom: null,
   sideMenuOpen: false,
-  expandedMenus: {},
   routePlanner: {
     stage: "input",
     src: "",
@@ -207,12 +342,6 @@ const state = {
     route: null,
     loading: false,
     error: "",
-  },
-  routeOptions: {
-    "Less walking": false,
-    "Walking only": false,
-    "Sheltered Paths": false,
-    "No keycard": false,
   },
   hideOptions: {
     distance: false,
@@ -880,7 +1009,9 @@ function setCameraFromUpdater(updater, elastic = false) {
 
 function selectResult(item) {
   const staticMatch = findStaticSearchItem(item);
-  const resolvedItem = staticMatch ? { ...staticMatch, ...item, box: item.box || staticMatch.box } : item;
+  const resolvedItem = staticMatch
+    ? { ...staticMatch, ...item, box: staticMatch.box || item.box }
+    : item;
   const buildingItem = resolvedItem.type === "room"
     ? SEARCH_ITEMS.find((entry) => entry.id === resolvedItem.buildingId)
     : resolvedItem;
@@ -905,6 +1036,9 @@ function selectResult(item) {
     loading: false,
     error: "",
   };
+  if (!activeTour) {
+    recordRecentPlace(resolvedItem);
+  }
 
   if (resolvedItem.type === "faculty") {
     state.mode = "home";
@@ -954,6 +1088,9 @@ function submitRoutePlanner() {
     return;
   }
 
+  const recentRouteLabel = `${getDisplayLabel(
+    state.routePlanner.srcSelection,
+  )} → ${getDisplayLabel(state.routePlanner.dstSelection)}`;
   state.routePlanner.loading = true;
   state.routePlanner.error = "";
   render();
@@ -975,6 +1112,7 @@ function submitRoutePlanner() {
       state.routePlanner.stage = "results";
       state.routePlanner.loading = false;
       if (state.routePlanner.route) {
+        recordRecentRoute(recentRouteLabel);
         openSelectedRouteFloor(state.routePlanner.route);
       }
       render();
@@ -985,6 +1123,42 @@ function submitRoutePlanner() {
       state.routePlanner.route = null;
       render();
     });
+}
+
+function openStoredPlace(item) {
+  if (!item) return;
+  state.sideMenuOpen = false;
+  selectResult(item);
+}
+
+function openStoredRoute(bookmark) {
+  const source = bookmark?.source;
+  const destination = bookmark?.destination;
+  if (!getRouteNodeId(source) || !getRouteNodeId(destination)) return;
+
+  const buildingId = source.buildingId || destination.buildingId;
+  const building = SEARCH_ITEMS.find((item) => item.id === buildingId) || getCom1Item();
+  state.sideMenuOpen = false;
+  if (building) {
+    selectResult(building);
+  }
+  state.routePlanner = {
+    stage: "input",
+    src: getDisplayLabel(source),
+    srcConfirmed: true,
+    srcSuggestions: [],
+    srcRequestId: 0,
+    srcSelection: source,
+    dst: getDisplayLabel(destination),
+    dstConfirmed: true,
+    dstSuggestions: [],
+    dstRequestId: 0,
+    dstSelection: destination,
+    route: null,
+    loading: false,
+    error: "",
+  };
+  submitRoutePlanner();
 }
 
 function setRoutePlannerSrc(value) {
@@ -1041,11 +1215,6 @@ function toggleHideOption(key) {
   render();
 }
 
-function toggleMenu(key) {
-  state.expandedMenus[key] = !state.expandedMenus[key];
-  render();
-}
-
 function signOut() {
   localStorage.removeItem("jwt_token");
   localStorage.removeItem("points_app_session");
@@ -1074,7 +1243,6 @@ function snapshotTourState() {
     activeFloor: state.activeFloor,
     activeRoom: state.activeRoom,
     sideMenuOpen: state.sideMenuOpen,
-    expandedMenus: { ...state.expandedMenus },
     routePlanner: {
       ...state.routePlanner,
       srcSuggestions: [...state.routePlanner.srcSuggestions],
@@ -1096,7 +1264,6 @@ function restoreTourState(snapshot) {
   state.activeFloor = snapshot.activeFloor;
   state.activeRoom = snapshot.activeRoom;
   state.sideMenuOpen = snapshot.sideMenuOpen;
-  state.expandedMenus = { ...snapshot.expandedMenus };
   state.routePlanner = {
     ...snapshot.routePlanner,
     srcSuggestions: [...snapshot.routePlanner.srcSuggestions],
@@ -1136,7 +1303,6 @@ function resetToDefaultMap() {
   state.query = "";
   state.searchResults = [];
   state.searchCommitted = false;
-  state.expandedMenus = {};
   resetFloorView();
   resetRoutePlannerState();
   setCamera(DEFAULT_CAMERA);
@@ -1144,33 +1310,24 @@ function resetToDefaultMap() {
 
 function renderForTourStep() {
   render();
-  window.setTimeout(() => activeTour?.tour?.refresh?.(), 0);
-  window.setTimeout(() => activeTour?.tour?.refresh?.(), 120);
 }
 
 function prepareTourStep(stepId) {
   const com1 = getCom1Item();
 
-  if (stepId === "search" || stepId === "quick-actions" || stepId === "menu-handle") {
+  if (stepId === "search") {
     resetToDefaultMap();
     renderForTourStep();
     return;
   }
 
-  if (stepId === "side-menu") {
+  if (
+    stepId === "route-overview" ||
+    stepId === "route-source" ||
+    stepId === "route-destination" ||
+    stepId === "route-go"
+  ) {
     resetToDefaultMap();
-    state.sideMenuOpen = true;
-    renderForTourStep();
-    return;
-  }
-
-  if (stepId === "locate") {
-    resetToDefaultMap();
-    renderForTourStep();
-    return;
-  }
-
-  if (stepId === "com1-search") {
     if (com1?.box) {
       selectResult(com1);
       state.query = com1.label;
@@ -1179,244 +1336,162 @@ function prepareTourStep(stepId) {
     }
     state.mode = "home";
     state.sideMenuOpen = false;
+    resetRoutePlannerState();
     renderForTourStep();
     return;
   }
 
-  if (stepId === "indoor-map" || stepId === "floors") {
+  if (stepId === "route-map" || stepId === "route-floors") {
+    resetToDefaultMap();
     if (com1?.box) {
       selectResult(com1);
       state.activeResult = com1;
     }
     state.mode = "map";
-    state.activeFloor = stepId === "floors" ? "L2" : "L1";
+    state.activeFloor = stepId === "route-floors" ? "L2" : "L1";
     state.sideMenuOpen = false;
-    renderForTourStep();
-    return;
-  }
-
-  if (stepId === "compass") {
-    resetToDefaultMap();
+    resetRoutePlannerState();
     renderForTourStep();
   }
-}
-
-function ensureDriverJs() {
-  if (window.driver?.js?.driver) {
-    return Promise.resolve(window.driver.js.driver);
-  }
-
-  const existingScript = document.getElementById(DRIVER_SCRIPT_ID);
-  if (existingScript?.dataset.ready === "true" && window.driver?.js?.driver) {
-    return Promise.resolve(window.driver.js.driver);
-  }
-
-  if (!document.getElementById(DRIVER_CSS_ID)) {
-    const link = document.createElement("link");
-    link.id = DRIVER_CSS_ID;
-    link.rel = "stylesheet";
-    link.href = `https://cdn.jsdelivr.net/npm/driver.js@${DRIVER_VERSION}/dist/driver.css`;
-    document.head.appendChild(link);
-  }
-
-  return new Promise((resolve, reject) => {
-    if (existingScript) {
-      existingScript.addEventListener(
-        "load",
-        () => {
-          if (!window.driver?.js?.driver) {
-            reject(new Error("Walkthrough library is unavailable."));
-            return;
-          }
-          resolve(window.driver.js.driver);
-        },
-        { once: true },
-      );
-      existingScript.addEventListener("error", () => reject(new Error("Unable to load walkthrough.")), {
-        once: true,
-      });
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = DRIVER_SCRIPT_ID;
-    script.src = `https://cdn.jsdelivr.net/npm/driver.js@${DRIVER_VERSION}/dist/driver.js.iife.js`;
-    script.async = true;
-    script.addEventListener(
-      "load",
-      () => {
-        script.dataset.ready = "true";
-        if (!window.driver?.js?.driver) {
-          reject(new Error("Walkthrough library is unavailable."));
-          return;
-        }
-        resolve(window.driver.js.driver);
-      },
-      { once: true },
-    );
-    script.addEventListener("error", () => reject(new Error("Unable to load walkthrough.")), {
-      once: true,
-    });
-    document.head.appendChild(script);
-  });
 }
 
 function startTutorial(force = false) {
-  if (pendingTourStart || activeTour) return;
-  pendingTourStart = true;
+  if (activeTour) return;
 
-  const restoreSnapshot = snapshotTourState();
+  activeTour = {
+    force,
+    index: 0,
+    restoreSnapshot: snapshotTourState(),
+    steps: [
+      {
+        id: "search",
+        element: "#searchInput",
+        title: "Search anything fast",
+        description:
+          "Welcome to NUS Maps. Start here by typing a faculty, building, or room, then press Enter or select a suggestion.",
+      },
+      {
+        id: "route-overview",
+        element: "#routePlannerPanel",
+        title: "Open the route planner",
+        description:
+          "Choose a COM1 building or room from search. The route planner appears beside the map and finds indoor paths within the selected building.",
+      },
+      {
+        id: "route-source",
+        element: "#routeSrcInput",
+        title: "Choose where you are starting",
+        description:
+          "Type the name or room number of your starting point. Select the matching location from the suggestions so the route finder can identify the exact map point.",
+      },
+      {
+        id: "route-destination",
+        element: "#routeDstInput",
+        title: "Choose your destination",
+        description:
+          "Enter a destination in the same building, then select it from the suggestions. Both fields must be selected suggestions, not only typed text.",
+      },
+      {
+        id: "route-go",
+        element: "#routePlannerGo",
+        title: "Find the path",
+        description:
+          "Select Go after choosing both locations. NUS Maps calculates the indoor route, opens the first floor of the path, and lists turn-by-turn directions.",
+      },
+      {
+        id: "route-map",
+        element: "#tourFloorplanSpotlight",
+        title: "Follow the highlighted path",
+        description:
+          "The route is drawn over the indoor floorplan. Drag to pan, scroll or pinch to zoom, and follow the directions shown in the route planner.",
+      },
+      {
+        id: "route-floors",
+        element: "#tourFloorButtonsSpotlight",
+        title: "Continue across floors",
+        description:
+          "If a route changes levels, use the floor buttons to view the next section. Route floors are marked, and the upcoming floor is highlighted when applicable.",
+      },
+    ],
+  };
 
-  ensureDriverJs()
-    .then((driverFactory) => {
-      if (typeof driverFactory !== "function") {
-        throw new Error("Walkthrough library is unavailable.");
-      }
+  prepareTourStep(activeTour.steps[0].id);
+}
 
-      const stepOrder = [
-        "search",
-        "quick-actions",
-        "menu-handle",
-        "side-menu",
-        "com1-search",
-        "indoor-map",
-        "floors",
-        "compass",
-      ];
+function finishTutorial() {
+  if (!activeTour) return;
+  const { force, restoreSnapshot } = activeTour;
+  activeTour = null;
+  restoreTourState(restoreSnapshot);
+  if (!force) {
+    localStorage.setItem(TOUR_STORAGE_KEY, "true");
+  }
+  render();
+}
 
-      const steps = [
-        {
-          element: "#searchInput",
-          popover: {
-            title: "Search anything fast",
-            description:
-              "Welcome to NUS Maps. Start here by typing a faculty, building, or room, then press Enter or click a suggestion.",
-            side: "over",
-            align: "center",
-            popoverClass: "tourPopover--centered",
-          },
-          onHighlightStarted: () => prepareTourStep("search"),
-        },
-        {
-          element: ".quickActions",
-          popover: {
-            title: "Use quick filters",
-            description:
-              "These shortcuts are meant for common needs like food, empty rooms, toilets, and bus stops.",
-            side: "over",
-            align: "center",
-            popoverClass: "tourPopover--centered",
-          },
-          onHighlightStarted: () => prepareTourStep("quick-actions"),
-        },
-        {
-          element: "#tourMenuHandleSpotlight",
-          popover: {
-            title: "Open the side menu",
-            description:
-              "Use this handle to reveal bookmarks, recent activity, route preferences, and visibility settings.",
-            side: "over",
-            align: "center",
-            popoverClass: "tourPopover--centered",
-          },
-          onHighlightStarted: () => prepareTourStep("menu-handle"),
-        },
-        {
-          element: "#tourSideMenuSpotlight",
-          popover: {
-            title: "Adjust your workspace",
-            description:
-              "The side menu keeps your saved places nearby and lets you hide overlays like the legend, compass, or UI.",
-            side: "over",
-            align: "center",
-            popoverClass: "tourPopover--centered",
-          },
-          onHighlightStarted: () => prepareTourStep("side-menu"),
-        },
-        {
-          element: "#tourSearchSpotlight",
-          popover: {
-            title: "Search for COM1",
-            description:
-              "Use COM1 as the example here. Entering COM1 zooms the campus map into that building so you can inspect it more closely.",
-            side: "over",
-            align: "center",
-            popoverClass: "tourPopover--centered",
-          },
-          onHighlightStarted: () => prepareTourStep("com1-search"),
-        },
-        {
-          element: "#tourFloorplanSpotlight",
-          popover: {
-            title: "Open the floorplan",
-            description:
-              "From the COM1 zoomed-in view, you can open the indoor floorplan and inspect the current level in detail.",
-            side: "over",
-            align: "center",
-            popoverClass: "tourPopover--centered",
-          },
-          onHighlightStarted: () => prepareTourStep("indoor-map"),
-        },
-        {
-          element: "#tourFloorButtonsSpotlight",
-          popover: {
-            title: "Switch floors",
-            description:
-              "These buttons let you move across COM1 floors once you are inside the building view.",
-            side: "over",
-            align: "center",
-            popoverClass: "tourPopover--centered",
-          },
-          onHighlightStarted: () => prepareTourStep("floors"),
-        },
-        {
-          element: "#compassButton",
-          popover: {
-            title: "Back to the default map",
-            description:
-              "After the floorplan steps, the tour returns to the default campus map. Use the compass to reset orientation whenever you rotate the view.",
-            side: "over",
-            align: "center",
-            popoverClass: "tourPopover--centered",
-          },
-          onHighlightStarted: () => prepareTourStep("compass"),
-        },
-      ];
+function moveTutorial(direction) {
+  if (!activeTour) return;
+  const nextIndex = activeTour.index + direction;
+  if (nextIndex >= activeTour.steps.length) {
+    finishTutorial();
+    return;
+  }
+  activeTour.index = Math.max(0, nextIndex);
+  prepareTourStep(activeTour.steps[activeTour.index].id);
+}
 
-      const tour = driverFactory({
-        showProgress: true,
-        allowClose: true,
-        animate: true,
-        smoothScroll: true,
-        overlayOpacity: 0.66,
-        disableActiveInteraction: false,
-        stagePadding: 10,
-        nextBtnText: "Next",
-        prevBtnText: "Back",
-        doneBtnText: "Done",
-        steps,
-        onDestroyed: () => {
-          activeTour = null;
-          restoreTourState(restoreSnapshot);
-          render();
-          if (!force) {
-            localStorage.setItem(TOUR_STORAGE_KEY, "true");
-          }
-        },
-      });
+function renderTutorialOverlay() {
+  document.getElementById("tutorialOverlayRoot")?.remove();
+  if (!activeTour) return;
 
-      activeTour = { tour, stepOrder };
-      prepareTourStep(stepOrder[0]);
-      tour.drive();
-    })
-    .catch((error) => {
-      restoreTourState(restoreSnapshot);
-      render();
-      window.alert(error.message || "Unable to start walkthrough.");
-    })
-    .finally(() => {
-      pendingTourStart = false;
-    });
+  const step = activeTour.steps[activeTour.index];
+  const target = document.querySelector(step.element);
+  const rect = target?.getBoundingClientRect();
+  const padding = 8;
+  const overlay = document.createElement("div");
+  overlay.id = "tutorialOverlayRoot";
+  overlay.innerHTML = `
+    <div class="tutorialShield" aria-hidden="true"></div>
+    ${
+      rect
+        ? `<div
+            class="tutorialSpotlight"
+            style="left:${Math.max(4, rect.left - padding)}px;top:${Math.max(
+              4,
+              rect.top - padding,
+            )}px;width:${Math.max(24, rect.width + padding * 2)}px;height:${Math.max(
+              24,
+              rect.height + padding * 2,
+            )}px;"
+          ></div>`
+        : ""
+    }
+    <section class="tutorialDialog" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle">
+      <button class="tutorialClose" type="button" aria-label="Close tutorial">×</button>
+      <span class="tutorialProgress">${activeTour.index + 1} of ${activeTour.steps.length}</span>
+      <h2 id="tutorialTitle">${escapeHtml(step.title)}</h2>
+      <p>${escapeHtml(step.description)}</p>
+      <div class="tutorialActions">
+        ${
+          activeTour.index > 0
+            ? `<button type="button" data-tutorial-action="back">Back</button>`
+            : `<span></span>`
+        }
+        <button type="button" class="tutorialNext" data-tutorial-action="next">${
+          activeTour.index === activeTour.steps.length - 1 ? "Done" : "Next"
+        }</button>
+      </div>
+    </section>
+  `;
+  document.body.appendChild(overlay);
+
+  overlay.querySelector(".tutorialClose")?.addEventListener("click", finishTutorial);
+  overlay.querySelector("[data-tutorial-action=\"back\"]")?.addEventListener("click", () => {
+    moveTutorial(-1);
+  });
+  overlay.querySelector("[data-tutorial-action=\"next\"]")?.addEventListener("click", () => {
+    moveTutorial(1);
+  });
 }
 
 function render() {
@@ -1457,6 +1532,15 @@ function render() {
       ? state.activeRoom.floorData
       : COM1_FLOORS.find((floor) => floor.id === state.activeFloor) || COM1_FLOORS[1];
   const account = getAccountState();
+  const recentPlaces = getRecentPlaces();
+  const recentRoutes = getRecentRoutes();
+  const bookmarks = getBookmarks();
+  const currentPlace = state.activeRoom || state.activeResult;
+  const currentPlaceIsBookmarked = isPlaceBookmarked(currentPlace);
+  const currentRouteIsBookmarked = isRouteBookmarked(
+    state.routePlanner.srcSelection,
+    state.routePlanner.dstSelection,
+  );
   const visibleUi = !state.hideOptions.ui;
   const showRoutePlanner =
     !!state.activeResult && (state.mode === "map" || visibleCamera.zoom >= 0.85);
@@ -1543,6 +1627,18 @@ function render() {
                 placeholder="Search for: Faculty, Building, Room..."
                 aria-label="Search for faculty, building, or room"
               />
+              ${
+                currentPlace
+                  ? `<button
+                      id="bookmarkPlaceButton"
+                      type="button"
+                      class="bookmarkPlaceButton ${currentPlaceIsBookmarked ? "isSaved" : ""}"
+                      aria-label="${currentPlaceIsBookmarked ? "Remove place bookmark" : "Bookmark place"}"
+                      aria-pressed="${currentPlaceIsBookmarked}"
+                      title="${currentPlaceIsBookmarked ? "Remove place bookmark" : "Bookmark place"}"
+                    >${currentPlaceIsBookmarked ? "★" : "☆"}</button>`
+                  : ""
+              }
               <button id="tourButton" type="button" class="tourButton">How to use</button>
             </div>
             ${
@@ -1559,12 +1655,9 @@ function render() {
                   </div>`
                 : ""
             }
-            <div class="quickActions">
-              ${QUICK_ACTIONS.map((label) => `<button type="button">${label}</button>`).join("")}
-            </div>
             ${
               showRoutePlanner
-                ? `<section class="routePlannerPanel">
+                ? `<section id="routePlannerPanel" class="routePlannerPanel">
                     <div class="routePlannerPanel__title">Plan route</div>
                     <label class="routePlannerField">
                       <span>Src:</span>
@@ -1658,6 +1751,12 @@ function render() {
                                 <strong>${escapeHtml(state.routePlanner.route.label)}</strong>
                                 <span>${escapeHtml(String(state.routePlanner.route.estimatedTimeMinutes))} min</span>
                                 <p>${escapeHtml(getRouteDescription(state.routePlanner.route))}</p>
+                                <button
+                                  id="bookmarkRouteButton"
+                                  type="button"
+                                  class="bookmarkRouteButton ${currentRouteIsBookmarked ? "isSaved" : ""}"
+                                  aria-pressed="${currentRouteIsBookmarked}"
+                                >${currentRouteIsBookmarked ? "Saved route" : "Save route"}</button>
                               </article>
                               <section class="routePlannerDirections">
                                 <div class="routePlannerDirections__title">Directions</div>
@@ -1691,21 +1790,90 @@ function render() {
             </header>
             <section class="historyBlock">
               <h2>Recent</h2>
-              ${renderMenuDropdown("recentPlaces", "Places", MENU_LISTS.recentPlaces)}
-              ${renderMenuDropdown("recentRoutes", "Routes", MENU_LISTS.recentRoutes)}
+              <div class="sideMenuGroup">
+                <h3>Places</h3>
+                ${
+                  recentPlaces.length > 0
+                    ? `<ul class="sideMenuItemList">
+                        ${recentPlaces
+                          .map(
+                            (place, index) => `<li>
+                              <button type="button" data-recent-place-index="${index}">
+                                ${escapeHtml(getDisplayLabel(place))}
+                              </button>
+                            </li>`,
+                          )
+                          .join("")}
+                      </ul>`
+                    : `<p class="sideMenuEmpty">No recent places yet.</p>`
+                }
+              </div>
+              <div class="sideMenuGroup">
+                <h3>Routes</h3>
+                ${
+                  recentRoutes.length > 0
+                    ? `<ul class="sideMenuTextList">
+                        ${recentRoutes.map((route) => `<li>${escapeHtml(route)}</li>`).join("")}
+                      </ul>`
+                    : `<p class="sideMenuEmpty">No recent routes yet.</p>`
+                }
+              </div>
             </section>
-            <section class="historyBlock">
+            <section class="bookmarksBlock">
               <h2>Bookmarks</h2>
-              ${renderMenuDropdown("bookmarkPlaces", "Places", MENU_LISTS.bookmarkPlaces)}
-              ${renderMenuDropdown("bookmarkRoutes", "Routes", MENU_LISTS.bookmarkRoutes)}
+              <div class="sideMenuGroup">
+                <h3>Places</h3>
+                ${
+                  bookmarks.places.length > 0
+                    ? `<ul class="sideMenuItemList">
+                        ${bookmarks.places
+                          .map(
+                            (bookmark, index) => `<li>
+                              <button type="button" data-bookmark-place-index="${index}">
+                                ${escapeHtml(bookmark.label)}
+                              </button>
+                              <button
+                                type="button"
+                                class="removeBookmarkButton"
+                                data-remove-bookmark-type="place"
+                                data-remove-bookmark-key="${escapeHtml(bookmark.key)}"
+                                aria-label="Remove ${escapeHtml(bookmark.label)} bookmark"
+                              >×</button>
+                            </li>`,
+                          )
+                          .join("")}
+                      </ul>`
+                    : `<p class="sideMenuEmpty">No bookmarked places yet.</p>`
+                }
+              </div>
+              <div class="sideMenuGroup">
+                <h3>Routes</h3>
+                ${
+                  bookmarks.routes.length > 0
+                    ? `<ul class="sideMenuItemList">
+                        ${bookmarks.routes
+                          .map(
+                            (bookmark, index) => `<li>
+                              <button type="button" data-bookmark-route-index="${index}">
+                                ${escapeHtml(bookmark.label)}
+                              </button>
+                              <button
+                                type="button"
+                                class="removeBookmarkButton"
+                                data-remove-bookmark-type="route"
+                                data-remove-bookmark-key="${escapeHtml(bookmark.key)}"
+                                aria-label="Remove ${escapeHtml(bookmark.label)} bookmark"
+                              >×</button>
+                            </li>`,
+                          )
+                          .join("")}
+                      </ul>`
+                    : `<p class="sideMenuEmpty">No bookmarked routes yet.</p>`
+                }
+              </div>
             </section>
-            <section><h2>Settings</h2></section>
-            <section>
-              <h2>Route Options:</h2>
-              ${ROUTE_OPTIONS.map(renderRouteOption).join("")}
-            </section>
-            <section>
-              <h2>Hide:</h2>
+            <section class="hideBlock">
+              <h2>Hide</h2>
               ${renderHideCheckbox("distance", "Distance Marker")}
               ${renderHideCheckbox("legend", "Building Legend")}
               ${renderHideCheckbox("compass", "Compass")}
@@ -2017,30 +2185,8 @@ function render() {
       nextFocus.setSelectionRange(priorFocus.selectionStart, priorFocus.selectionEnd);
     }
   }
-}
 
-function renderMenuDropdown(id, label, items) {
-  const expanded = !!state.expandedMenus[id];
-  return `
-    <div class="menuDropdown ${expanded ? "isExpanded" : ""}">
-      <button type="button" data-toggle-menu="${id}">
-        <span>${expanded ? "▼" : "➤"}</span>${label}
-      </button>
-      ${
-        expanded
-          ? `<div class="menuDropdownList ${items.length > 10 ? "isScrollable" : ""}">
-              ${items.map((item) => `<button type="button">${escapeHtml(item)}</button>`).join("")}
-            </div>`
-          : ""
-      }
-    </div>
-  `;
-}
-
-function renderRouteOption(label) {
-  return `<label><input type="checkbox" data-route-option="${escapeHtml(label)}" ${
-    state.routeOptions[label] ? "checked" : ""
-  } /><span>${escapeHtml(label)}</span></label>`;
+  renderTutorialOverlay();
 }
 
 function renderHideCheckbox(key, label) {
@@ -2082,6 +2228,8 @@ function bindEvents(root, cameraViewport, visibleCamera) {
   const routeSrcInput = root.querySelector("#routeSrcInput");
   const routeDstInput = root.querySelector("#routeDstInput");
   const routePlannerGo = root.querySelector("#routePlannerGo");
+  const bookmarkPlaceButton = root.querySelector("#bookmarkPlaceButton");
+  const bookmarkRouteButton = root.querySelector("#bookmarkRouteButton");
   const tourButton = root.querySelector("#tourButton");
   const menuHandle = root.querySelector("#menuHandle");
   const locateButton = root.querySelector("#locateButton");
@@ -2164,18 +2312,35 @@ function bindEvents(root, cameraViewport, visibleCamera) {
     });
   });
 
-  root.querySelectorAll("[data-toggle-menu]").forEach((button) => {
-    button.addEventListener("click", () => toggleMenu(button.dataset.toggleMenu));
+  root.querySelectorAll("[data-recent-place-index]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const place = getRecentPlaces()[Number(button.dataset.recentPlaceIndex)];
+      if (place) openStoredPlace(place);
+    });
+  });
+
+  root.querySelectorAll("[data-bookmark-place-index]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const bookmark = getBookmarks().places[Number(button.dataset.bookmarkPlaceIndex)];
+      if (bookmark?.item) openStoredPlace(bookmark.item);
+    });
+  });
+
+  root.querySelectorAll("[data-bookmark-route-index]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const bookmark = getBookmarks().routes[Number(button.dataset.bookmarkRouteIndex)];
+      if (bookmark) openStoredRoute(bookmark);
+    });
+  });
+
+  root.querySelectorAll("[data-remove-bookmark-type]").forEach((button) => {
+    button.addEventListener("click", () => {
+      removeBookmark(button.dataset.removeBookmarkType, button.dataset.removeBookmarkKey);
+    });
   });
 
   root.querySelectorAll("[data-hide-key]").forEach((checkbox) => {
     checkbox.addEventListener("change", () => toggleHideOption(checkbox.dataset.hideKey));
-  });
-
-  root.querySelectorAll("[data-route-option]").forEach((checkbox) => {
-    checkbox.addEventListener("change", () => {
-      state.routeOptions[checkbox.dataset.routeOption] = checkbox.checked;
-    });
   });
 
   root.querySelectorAll("[data-account-action=\"sign-out\"]").forEach((button) => {
@@ -2212,6 +2377,18 @@ function bindEvents(root, cameraViewport, visibleCamera) {
     routePlannerGo.addEventListener("click", () => {
       state.routePlanner.srcConfirmed = true;
       submitRoutePlanner();
+    });
+  }
+
+  if (bookmarkPlaceButton) {
+    bookmarkPlaceButton.addEventListener("click", () => {
+      togglePlaceBookmark(state.activeRoom || state.activeResult);
+    });
+  }
+
+  if (bookmarkRouteButton) {
+    bookmarkRouteButton.addEventListener("click", () => {
+      toggleRouteBookmark(state.routePlanner.srcSelection, state.routePlanner.dstSelection);
     });
   }
 
@@ -2520,6 +2697,10 @@ window.addEventListener("resize", () => {
 
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
+    if (activeTour) {
+      finishTutorial();
+      return;
+    }
     state.hideOptions.ui = false;
     render();
   }
