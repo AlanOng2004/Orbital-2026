@@ -53,6 +53,36 @@ body {
   -webkit-user-drag: none;
 }
 
+.campusLegendMask {
+  position: absolute;
+  left: 2700px;
+  top: 1710px;
+  width: 520px;
+  height: 560px;
+  background: #eef0f2;
+  pointer-events: none;
+}
+
+.campusScaleMask {
+  position: absolute;
+  left: 0;
+  top: 2000px;
+  width: 850px;
+  height: 142px;
+  background: #eef0f2;
+  pointer-events: none;
+}
+
+.campusCompassMask {
+  position: absolute;
+  left: 2905px;
+  top: 45px;
+  width: 165px;
+  height: 650px;
+  background: #eef0f2;
+  pointer-events: none;
+}
+
 .viewer--map-page .mapPlane {
   filter: grayscale(0.95) opacity(0.38);
 }
@@ -575,58 +605,155 @@ body {
   box-shadow: 0 10px 24px rgba(250, 204, 21, 0.3);
 }
 
-.menuHandle {
+.sideMenu {
   position: absolute;
   z-index: 45;
-  min-width: 34px;
-  height: 58px;
-  border: 1px solid #263846;
-  border-radius: 0 6px 6px 0;
-  background: rgba(255, 255, 255, 0.94);
-  color: #172535;
-  font-weight: 800;
-  box-shadow: 0 8px 18px rgba(23, 37, 52, 0.12);
+  display: flex;
+  padding: 0;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.97);
+  border: 0;
+  border-right: 1px solid rgba(25, 48, 67, 0.16);
+  box-shadow: 8px 0 30px rgba(23, 37, 52, 0.1);
+  box-sizing: border-box;
+  transition: width 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sideMenuRail {
+  flex: 0 0 88px;
+  width: 88px;
+  min-height: 100%;
+  padding: 18px 8px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  background: #f4fafc;
+  border-right: 1px solid rgba(25, 48, 67, 0.1);
+  box-sizing: border-box;
+}
+
+.sideMenuRail button {
+  min-height: 74px;
+  padding: 8px 3px;
+  border: 0;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #5c6770;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
   cursor: pointer;
 }
 
-.sideMenu {
-  position: absolute;
-  z-index: 35;
-  padding: 16px 18px;
-  overflow: auto;
-  background: rgba(255, 255, 255, 0.97);
-  border: 1px solid #263846;
-  box-shadow: none;
-  box-sizing: border-box;
-  transform: translateX(-102%);
-  transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+.sideMenuRail button:hover,
+.sideMenuRail button:focus-visible {
+  color: #16384f;
+  background: #dcecf2;
+  outline: 0;
 }
 
-.sideMenu.isOpen {
-  transform: translateX(0);
+.sideMenuRail .railMenuButton {
+  min-height: 52px;
+  margin-bottom: 6px;
+}
+
+.sideMenuIcon {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+}
+
+.railSpacer {
+  flex: 1 1 auto;
+  min-height: 22px;
+  border-bottom: 1px solid rgba(25, 48, 67, 0.13);
+}
+
+.sideMenuRail .railAccountButton {
+  min-height: 68px;
+}
+
+.railAvatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  background: #1477d4;
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.sideMenuPanel {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: auto;
+  padding: 18px 18px 36px;
+  background: rgba(255, 255, 255, 0.98);
+  opacity: 1;
+  box-sizing: border-box;
+  transition: opacity 140ms ease;
+}
+
+.sideMenu.isCollapsed .sideMenuPanel {
+  width: 0;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0;
 }
 
 .sideMenu header {
   width: 100%;
-  min-height: 76px;
-  padding: 10px 8px;
-  border: 1px solid #263846;
-  border-radius: 10px;
+  min-height: 116px;
+  padding: 14px;
+  border: 1px solid #cbd8e1;
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 4px;
+  gap: 12px;
   font-size: 18px;
   box-sizing: border-box;
+  scroll-margin-top: 8px;
+}
+
+.accountIdentity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.accountIdentity > span {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: #ffffff;
+  background: #1477d4;
+  font-size: 17px;
+  font-weight: 850;
+}
+
+.accountIdentity > div {
+  min-width: 0;
 }
 
 .sideMenu header strong {
   display: block;
-  font-weight: 500;
-}
-
-.sideMenu header::after {
-  content: none;
+  color: #1b3244;
+  font-size: 16px;
+  font-weight: 750;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .accountAction {
@@ -641,19 +768,44 @@ body {
   cursor: pointer;
 }
 
+.annotatorLink {
+  min-height: 38px;
+  padding: 0 10px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #0f5e9e;
+  background: #e9f4fc;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.annotatorLink .sideMenuIcon {
+  width: 20px;
+  height: 20px;
+}
+
 .sideMenu section {
-  padding: 18px 6px;
-  border-bottom: 0;
+  padding: 24px 4px 4px;
+  border-bottom: 1px solid rgba(25, 48, 67, 0.1);
+  scroll-margin-top: 8px;
 }
 
 .sideMenu h2 {
-  margin: 0 0 12px;
-  font-size: 15px;
-  font-weight: 500;
+  margin: 0 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #213b4d;
+  font-size: 17px;
+  font-weight: 800;
 }
 
-.historyBlock {
-  margin-top: 26px;
+.sideMenu h2 .sideMenuIcon {
+  width: 22px;
+  height: 22px;
 }
 
 .sideMenuGroup + .sideMenuGroup {
@@ -943,36 +1095,6 @@ body {
   font-weight: 500;
 }
 
-.legendOverlay {
-  position: absolute;
-  z-index: 24;
-  width: 136px;
-  padding: 5px 7px;
-  background: rgba(255, 255, 255, 0.76);
-  border-radius: 4px;
-  pointer-events: none;
-}
-
-.legendOverlay div {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 20px;
-}
-
-.legendOverlay span {
-  width: 34px;
-  height: 16px;
-  border: 1px solid rgba(17, 24, 39, 0.1);
-}
-
-.legendOverlay p {
-  margin: 0;
-  color: #486a9c;
-  font-size: 13px;
-  line-height: 16px;
-}
-
 .buildingHotspot {
   position: absolute;
   border: 0;
@@ -1230,23 +1352,22 @@ body {
     top: 0 !important;
     width: min(88vw, 340px) !important;
     height: 100dvh !important;
-    padding: max(16px, env(safe-area-inset-top)) 16px max(18px, env(safe-area-inset-bottom));
+    padding: 0;
     z-index: 55;
   }
 
-  .menuHandle {
-    left: 0 !important;
-    top: auto !important;
-    right: auto;
-    bottom: max(104px, calc(env(safe-area-inset-bottom) + 88px));
-    z-index: 58;
-    width: 42px;
-    min-width: 42px;
-    height: 52px;
+  .sideMenu.isCollapsed {
+    width: 88px !important;
   }
 
-  .viewer--menu-open .menuHandle {
-    left: min(88vw, 340px) !important;
+  .sideMenuRail {
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
+  .sideMenuPanel {
+    padding-top: max(16px, env(safe-area-inset-top));
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
   }
 
   .locateButton {
@@ -1281,8 +1402,7 @@ body {
     height: 44px;
   }
 
-  .scaleOverlay,
-  .legendOverlay {
+  .scaleOverlay {
     display: none;
   }
 

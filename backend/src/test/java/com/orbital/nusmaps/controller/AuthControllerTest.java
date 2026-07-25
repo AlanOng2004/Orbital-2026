@@ -54,7 +54,7 @@ class AuthControllerTest {
         request.setUsername("alice");
         request.setPassword("password");
         request.setGender("female");
-        request.setIsAdmin(null);
+        request.setIsAdmin(true);
 
         User savedUser = TestDataFactory.user(5L, "alice", "encoded", false);
         savedUser.setGender(User.Gender.Female);

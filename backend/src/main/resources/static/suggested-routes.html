@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Suggested routes · NUS Maps</title>
+    <link rel="stylesheet" href="./suggested-routes.css?v=20260725" />
+  </head>
+  <body>
+    <header class="pageHeader">
+      <div>
+        <a href="/index.html">NUS Maps</a>
+        <span>/</span>
+        <strong>Suggested routes</strong>
+      </div>
+      <nav>
+        <a href="/annotator/index.html">Back to annotator</a>
+        <button id="signOutButton" type="button">Sign out</button>
+      </nav>
+    </header>
+
+    <main>
+      <section class="pageIntro">
+        <span>Admin review</span>
+        <h1>Suggested routes</h1>
+        <p>Review route JSON files submitted by NUS Maps users before importing them through the annotator.</p>
+      </section>
+
+      <section class="suggestionsPanel" aria-labelledby="suggestionsHeading">
+        <div class="panelHeading">
+          <div>
+            <h2 id="suggestionsHeading">Pending suggestions</h2>
+            <p id="suggestionCount">Loading…</p>
+          </div>
+          <button id="refreshButton" type="button">Refresh</button>
+        </div>
+        <div id="suggestionStatus" class="statusMessage" role="status"></div>
+        <div id="suggestionList" class="suggestionList"></div>
+      </section>
+    </main>
+
+    <script src="./suggested-routes.js?v=20260725"></script>
+  </body>
+</html>

@@ -1,6 +1,33 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import './App.css';
 
 const COORDINATE_NODE_TYPE = 'Coordinate';
+const FALLBACK_FLOORPLANS = [
+  {
+    floorplanId: 1,
+    buildingName: 'COM1',
+    level: -1,
+    imageUrl: '/img/COMBLK1_B1.jpg',
+  },
+  {
+    floorplanId: 2,
+    buildingName: 'COM1',
+    level: 1,
+    imageUrl: '/img/COMBLK1_01.jpg',
+  },
+  {
+    floorplanId: 3,
+    buildingName: 'COM1',
+    level: 2,
+    imageUrl: '/img/COMBLK1_02.jpg',
+  },
+  {
+    floorplanId: 4,
+    buildingName: 'COM1',
+    level: 3,
+    imageUrl: '/img/COMBLK1_03.jpg',
+  },
+];
 
 const NODE_TYPES = [
   'Food',
@@ -377,8 +404,39 @@ function downloadJson(filename, payload) {
   URL.revokeObjectURL(url);
 }
 
+function getStoredSession() {
+  try {
+    const rawSession = localStorage.getItem('points_app_session');
+    return rawSession ? JSON.parse(rawSession) : null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveFloorplanImageUrl(imageUrl) {
+  const normalized = String(imageUrl || '').trim();
+  if (!normalized) return null;
+  if (/^(?:[a-z]+:|\/)/i.test(normalized)) return normalized;
+  return `/${normalized.replace(/^\.?\//, '')}`;
+}
+
+function formatFloorplanLabel(floorplan) {
+  const level = Number(floorplan.level);
+  const levelLabel = level < 0
+    ? `Basement ${Math.abs(level)}`
+    : level === 0
+      ? 'Ground floor'
+      : `Level ${level}`;
+  return `${floorplan.buildingName} · ${levelLabel} (ID ${floorplan.floorplanId})`;
+}
+
 export default function App() {
-  const [imageUrl, setImageUrl] = useState(null);
+  const session = getStoredSession();
+  const jwtToken = localStorage.getItem('jwt_token');
+  const isAdmin = Boolean(jwtToken && session?.isAdmin === true);
+  const [floorplans, setFloorplans] = useState(FALLBACK_FLOORPLANS);
+  const [floorplanLoadStatus, setFloorplanLoadStatus] = useState('loading');
+  const [imageUrl, setImageUrl] = useState(FALLBACK_FLOORPLANS[0].imageUrl);
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [mode, setMode] = useState('ADD_NODE');
@@ -387,6 +445,12 @@ export default function App() {
   const [selectedNode, setSelectedNode] = useState(null);
   const [zoom, setZoom] = useState(1);
   const [history, setHistory] = useState([]);
+  const [suggestionOpen, setSuggestionOpen] = useState(false);
+  const [suggestionTitle, setSuggestionTitle] = useState('');
+  const [suggestionDescription, setSuggestionDescription] = useState('');
+  const [suggestionFile, setSuggestionFile] = useState(null);
+  const [suggestionStatus, setSuggestionStatus] = useState({ type: '', message: '' });
+  const [suggestionSubmitting, setSuggestionSubmitting] = useState(false);
 
   const [hoveredNodeId, setHoveredNodeId] = useState(null);
   const [hoveredEdgeId, setHoveredEdgeId] = useState(null);
@@ -396,7 +460,9 @@ export default function App() {
 
   const [currentNodeName, setCurrentNodeName] = useState('Corridor');
   const [currentNodeType, setCurrentNodeType] = useState('Corridor');
-  const [currentFloorplanId, setCurrentFloorplanId] = useState(1);
+  const [currentFloorplanId, setCurrentFloorplanId] = useState(
+    FALLBACK_FLOORPLANS[0].floorplanId,
+  );
   const [currentLongitude, setCurrentLongitude] = useState('');
   const [currentLatitude, setCurrentLatitude] = useState('');
 
@@ -409,6 +475,50 @@ export default function App() {
     isRamp: false,
     isElevator: false,
   });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadFloorplans = async () => {
+      try {
+        const response = await fetch('/api/annotator/floorplans');
+        if (!response.ok) {
+          throw new Error('Unable to load floorplans.');
+        }
+        const body = await response.json();
+        const availableFloorplans = Array.isArray(body)
+          ? body.filter((floorplan) => (
+            Number.isFinite(Number(floorplan.floorplanId)) &&
+            typeof floorplan.buildingName === 'string' &&
+            floorplan.buildingName.trim()
+          ))
+          : [];
+
+        if (cancelled) return;
+        if (availableFloorplans.length === 0) {
+          setFloorplanLoadStatus('fallback');
+          return;
+        }
+
+        const initialFloorplan = availableFloorplans.find(
+          (floorplan) => Number(floorplan.floorplanId) === FALLBACK_FLOORPLANS[0].floorplanId,
+        ) || availableFloorplans[0];
+        setFloorplans(availableFloorplans);
+        setCurrentFloorplanId(Number(initialFloorplan.floorplanId));
+        setImageUrl(resolveFloorplanImageUrl(initialFloorplan.imageUrl));
+        setFloorplanLoadStatus('ready');
+      } catch {
+        if (!cancelled) {
+          setFloorplanLoadStatus('fallback');
+        }
+      }
+    };
+
+    loadFloorplans();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
@@ -455,6 +565,62 @@ export default function App() {
     }
   };
 
+  const closeSuggestionModal = () => {
+    if (suggestionSubmitting) return;
+    setSuggestionOpen(false);
+    setSuggestionStatus({ type: '', message: '' });
+  };
+
+  const handleSuggestionSubmit = async (event) => {
+    event.preventDefault();
+    if (!jwtToken || !session) {
+      setSuggestionStatus({
+        type: 'error',
+        message: 'Sign in to submit a suggested route.',
+      });
+      return;
+    }
+    if (!suggestionFile) {
+      setSuggestionStatus({ type: 'error', message: 'Choose a JSON import file.' });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('title', suggestionTitle);
+    formData.append('description', suggestionDescription);
+    formData.append('file', suggestionFile);
+    setSuggestionSubmitting(true);
+    setSuggestionStatus({ type: '', message: '' });
+
+    try {
+      const response = await fetch('/api/annotator/suggestions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${jwtToken}`,
+        },
+        body: formData,
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body.error || 'Unable to submit the suggested route.');
+      }
+      setSuggestionTitle('');
+      setSuggestionDescription('');
+      setSuggestionFile(null);
+      setSuggestionStatus({
+        type: 'success',
+        message: 'Suggestion submitted for admin review.',
+      });
+    } catch (error) {
+      setSuggestionStatus({
+        type: 'error',
+        message: error.message || 'Unable to submit the suggested route.',
+      });
+    } finally {
+      setSuggestionSubmitting(false);
+    }
+  };
+
   const handleNodeTypeChange = (event) => {
     const nextType = event.target.value;
     setCurrentNodeType(nextType);
@@ -466,8 +632,30 @@ export default function App() {
     }
   };
 
-  const handleFloorplanIdChange = (event) => {
-    setCurrentFloorplanId(parseInt(event.target.value, 10) || 1);
+  const handleFloorplanChange = (event) => {
+    const nextFloorplanId = Number(event.target.value);
+    const nextFloorplan = floorplans.find(
+      (floorplan) => Number(floorplan.floorplanId) === nextFloorplanId,
+    );
+
+    if (!nextFloorplan || nextFloorplanId === currentFloorplanId) {
+      return;
+    }
+    if (
+      (nodes.length > 0 || edges.length > 0) &&
+      !window.confirm('Switching floorplans will clear the current nodes and edges. Continue?')
+    ) {
+      return;
+    }
+
+    setCurrentFloorplanId(nextFloorplanId);
+    setImageUrl(resolveFloorplanImageUrl(nextFloorplan.imageUrl));
+    setNodes([]);
+    setEdges([]);
+    setHistory([]);
+    setSelectedNode(null);
+    setNextNodeId(1);
+    setNextEdgeId(1);
   };
 
   const handleCanvasClick = (e) => {
@@ -667,30 +855,61 @@ export default function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: 'sans-serif' }}>
+      <header className="annotatorTopBar">
+        <div>
+          <a href="/index.html" className="annotatorBrand">NUS Maps</a>
+          <span>Route Annotator</span>
+        </div>
+        <nav aria-label="Annotator actions">
+          <button type="button" onClick={() => setSuggestionOpen(true)}>Suggest import</button>
+          {isAdmin && <a href="/suggested-routes.html">Suggested routes</a>}
+        </nav>
+      </header>
       <div style={{ padding: '8px 10px', background: '#ecf0f1', display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'flex-start', borderBottom: '2px solid #bdc3c7', zIndex: 100 }}>
         <div style={toolbarPanelStyle}>
           <strong>0. Active Floorplan</strong>
-          <label>ID: <input type="number" value={currentFloorplanId} onChange={handleFloorplanIdChange} style={{ width: '80px' }} /></label>
+          <label>
+            Floorplan:
+            <select
+              aria-label="Floorplan"
+              value={currentFloorplanId}
+              onChange={handleFloorplanChange}
+              style={{ display: 'block', width: '230px', marginTop: '4px' }}
+            >
+              {floorplans.map((floorplan) => (
+                <option key={floorplan.floorplanId} value={floorplan.floorplanId}>
+                  {formatFloorplanLabel(floorplan)}
+                </option>
+              ))}
+            </select>
+          </label>
+          {floorplanLoadStatus === 'fallback' && (
+            <small>Using bundled COM1 floorplans.</small>
+          )}
         </div>
 
         <div style={{ ...toolbarPanelStyle, minWidth: '360px' }}>
           <strong>1. Core Tools</strong>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>Image:</span>
+            <span>Override image:</span>
             <input type="file" onChange={handleImageUpload} style={{ maxWidth: '230px' }} />
           </div>
-          <input
-            ref={jsonImportInputRef}
-            type="file"
-            accept="application/json,.json"
-            onChange={handleJsonImport}
-            style={{ display: 'none' }}
-          />
+          {isAdmin && (
+            <input
+              ref={jsonImportInputRef}
+              type="file"
+              accept="application/json,.json"
+              onChange={handleJsonImport}
+              style={{ display: 'none' }}
+            />
+          )}
 
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             <button onClick={() => { setMode('ADD_NODE'); setSelectedNode(null); }} style={{ ...compactButtonStyle, cursor: 'pointer', background: mode === 'ADD_NODE' ? '#3498db' : '#fff', color: mode === 'ADD_NODE' ? 'white' : 'black', border: '1px solid #ccc' }}>Add Nodes</button>
             <button onClick={() => setMode('ADD_EDGE')} style={{ ...compactButtonStyle, cursor: 'pointer', background: mode === 'ADD_EDGE' ? '#2ecc71' : '#fff', color: mode === 'ADD_EDGE' ? 'white' : 'black', border: '1px solid #ccc' }}>Connect Edges</button>
-            <button onClick={() => jsonImportInputRef.current?.click()} style={{ ...compactButtonStyle, cursor: 'pointer', background: '#34495e', color: 'white', border: 'none', fontWeight: 'bold' }}>Import JSON</button>
+            {isAdmin && (
+              <button onClick={() => jsonImportInputRef.current?.click()} style={{ ...compactButtonStyle, cursor: 'pointer', background: '#34495e', color: 'white', border: 'none', fontWeight: 'bold' }}>Import JSON</button>
+            )}
             <button onClick={exportJson} disabled={nodes.length === 0} style={{ ...compactButtonStyle, cursor: nodes.length === 0 ? 'not-allowed' : 'pointer', background: '#2c3e50', color: 'white', border: 'none', fontWeight: 'bold', opacity: nodes.length === 0 ? 0.5 : 1 }}>Export JSON</button>
             <button onClick={handleUndo} disabled={history.length === 0} style={{ ...compactButtonStyle, cursor: history.length === 0 ? 'not-allowed' : 'pointer', background: '#f39c12', color: 'white', border: 'none', opacity: history.length === 0 ? 0.5 : 1 }}>
               Undo Last
@@ -879,6 +1098,72 @@ export default function App() {
           </div>
         )}
       </div>
+      {suggestionOpen && (
+        <div className="suggestionModalBackdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) closeSuggestionModal();
+        }}>
+          <section className="suggestionModal" role="dialog" aria-modal="true" aria-labelledby="suggestionTitle">
+            <button
+              type="button"
+              className="suggestionModalClose"
+              aria-label="Close suggestion form"
+              onClick={closeSuggestionModal}
+            >
+              ×
+            </button>
+            <span className="suggestionEyebrow">Community contribution</span>
+            <h2 id="suggestionTitle">Suggest an import</h2>
+            <p>Send a JSON route file with a short explanation. An administrator will review it before anything is imported.</p>
+            <form onSubmit={handleSuggestionSubmit}>
+              <label>
+                Title
+                <input
+                  type="text"
+                  value={suggestionTitle}
+                  onChange={(event) => setSuggestionTitle(event.target.value)}
+                  maxLength="160"
+                  required
+                  placeholder="e.g. Add COM1 level 2 connector"
+                />
+              </label>
+              <label>
+                Description
+                <textarea
+                  value={suggestionDescription}
+                  onChange={(event) => setSuggestionDescription(event.target.value)}
+                  maxLength="4000"
+                  required
+                  rows="5"
+                  placeholder="Describe what should be added or corrected."
+                />
+              </label>
+              <label>
+                JSON import file
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  onChange={(event) => setSuggestionFile(event.target.files?.[0] || null)}
+                  required
+                />
+              </label>
+              {suggestionStatus.message && (
+                <p className={`suggestionStatus suggestionStatus--${suggestionStatus.type}`}>
+                  {suggestionStatus.message}
+                  {suggestionStatus.type === 'error' && !jwtToken && (
+                    <> <a href="/login.html?redirect=%2Fannotator%2Findex.html">Sign in</a></>
+                  )}
+                </p>
+              )}
+              <div className="suggestionModalActions">
+                <button type="button" onClick={closeSuggestionModal} disabled={suggestionSubmitting}>Cancel</button>
+                <button type="submit" className="suggestionSubmitButton" disabled={suggestionSubmitting}>
+                  {suggestionSubmitting ? 'Submitting…' : 'Submit suggestion'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
