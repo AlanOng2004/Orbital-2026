@@ -24,7 +24,8 @@ Set these variables on the Railway backend service:
 - `SPRING_DATASOURCE_URL`
 - `SPRING_DATASOURCE_USERNAME`
 - `SPRING_DATASOURCE_PASSWORD`
-- `SPRING_JPA_HIBERNATE_DDL_AUTO=update`
+- `SPRING_JPA_HIBERNATE_DDL_AUTO=update` (the value must be the literal word
+  `update`, not a `${...}` placeholder)
 - `SPRING_FLYWAY_ENABLED=false`
 - `APP_JWT_SECRET=<long-random-secret>`
 
