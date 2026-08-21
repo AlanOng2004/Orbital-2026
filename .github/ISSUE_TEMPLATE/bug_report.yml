@@ -1,0 +1,53 @@
+name: Bug report
+description: Report a reproducible problem in NUS Maps
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping improve NUS Maps. Do not use this form for security vulnerabilities; follow SECURITY.md instead.
+  - type: checkboxes
+    attributes:
+      label: Existing reports
+      options:
+        - label: I searched existing issues and did not find a duplicate.
+          required: true
+  - type: textarea
+    attributes:
+      label: What happened?
+      description: Describe the actual behavior and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest reliable sequence that demonstrates the problem.
+      placeholder: |
+        1. Open ...
+        2. Select ...
+        3. See ...
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: Affected area
+      options:
+        - Main map interface
+        - Indoor routing
+        - Authentication
+        - Floorplan annotator
+        - Administrator workflow
+        - Backend API
+        - Documentation or setup
+        - Other
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Environment
+      description: Include browser, operating system, Java/Node version, or deployment environment as relevant.
+  - type: textarea
+    attributes:
+      label: Logs or screenshots
+      description: Remove secrets and personal information before posting logs.

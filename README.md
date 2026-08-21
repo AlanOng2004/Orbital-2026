@@ -223,7 +223,9 @@ Railway injects `PORT`; Spring Boot reads it automatically. Because Railway only
 
 ## Contributing
 
-Keep changes focused and include tests for backend behavior. Before opening a pull request, run:
+Contributions are welcome. Start with the [contribution guide](CONTRIBUTING.md), which covers local setup, project conventions, testing, and the pull request process. Please also read our [Code of Conduct](CODE_OF_CONDUCT.md) and report security issues according to the [security policy](SECURITY.md).
+
+Before opening a pull request, run:
 
 ```bash
 cd backend
@@ -236,3 +238,7 @@ npm run build
 ```
 
 When the annotator changes, also regenerate the backend-served bundle with `npm run build -- --config vite.backend.config.js` and include the resulting static assets in the same change.
+
+## License
+
+NUS Maps is available under the [MIT License](LICENSE).
