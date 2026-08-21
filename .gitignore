@@ -1,1 +1,31 @@
-backend/target/
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Java and Maven
+target/
+out/
+*.class
+*.jar
+*.war
+*.iml
+.classpath
+.project
+.settings/
+
+# JavaScript
+node_modules/
+dist/
+.vite/
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
